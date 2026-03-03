@@ -341,6 +341,33 @@ export function WorkflowEditor() {
     setSelectedNodeId(null);
   }, []);
 
+  // Delete node handler
+  const deleteNode = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+      setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+      setSelectedNodeId(null);
+      setIsDirty(true);
+    },
+    [setNodes, setEdges],
+  );
+
+  // Keyboard delete handler
+  const onNodesDelete = useCallback(
+    (deleted: Node[]) => {
+      deleted.forEach((node) => {
+        setEdges((eds) => eds.filter((e) => e.source !== node.id && e.target !== node.id));
+      });
+      setSelectedNodeId(null);
+      setIsDirty(true);
+    },
+    [setEdges],
+  );
+
+  const onEdgesDelete = useCallback(() => {
+    setIsDirty(true);
+  }, []);
+
   // Drag and drop from palette
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -460,10 +487,13 @@ export function WorkflowEditor() {
             edges={edges}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
+            onNodesDelete={onNodesDelete}
+            onEdgesDelete={onEdgesDelete}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
+            deleteKeyCode={['Backspace', 'Delete']}
             fitView
           >
             <Background />
@@ -479,6 +509,7 @@ export function WorkflowEditor() {
             nodes={nodes}
             setNodes={setNodes}
             onClose={() => setSelectedNodeId(null)}
+            onDelete={() => deleteNode(selectedNodeId)}
           />
         )}
 

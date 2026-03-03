@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
-import { X, Settings, Play, ChevronDown, ChevronRight, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { X, Settings, Play, ChevronDown, ChevronRight, Clock, CheckCircle, XCircle, Loader2, Trash2 } from 'lucide-react';
 import { credentialsApi } from '@/api/client';
 
 interface NDVPanelProps {
@@ -12,11 +12,12 @@ interface NDVPanelProps {
   nodes: Node[];
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   onClose: () => void;
+  onDelete?: () => void;
 }
 
 type TabType = 'settings' | 'output';
 
-export function NDVPanel({ nodeId, nodes, setNodes, onClose }: NDVPanelProps) {
+export function NDVPanel({ nodeId, nodes, setNodes, onClose, onDelete }: NDVPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('settings');
   const node = nodes.find((n) => n.id === nodeId);
   
@@ -39,12 +40,27 @@ export function NDVPanel({ nodeId, nodes, setNodes, onClose }: NDVPanelProps) {
             {node.data.name || node.type}
           </h2>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
-        >
-          <X size={18} />
-        </button>
+        <div className="flex items-center gap-1">
+          {onDelete && (
+            <button
+              onClick={() => {
+                if (confirm('Delete this node?')) {
+                  onDelete();
+                }
+              }}
+              className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors text-muted-foreground hover:text-red-600"
+              title="Delete node"
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
