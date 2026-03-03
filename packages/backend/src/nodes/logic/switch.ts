@@ -1,4 +1,4 @@
-import type { NodeRunner, NodeContext, NodeResult } from '@orchestrator/shared';
+import type { NodeRunner, NodeContext, NodeResult } from '@garage-engine/shared';
 
 function getNestedValue(obj: unknown, path: string): unknown {
   const parts = path.split('.');

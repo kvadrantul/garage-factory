@@ -1,4 +1,4 @@
-import type { WorkflowDefinition, WorkflowEdge } from '@orchestrator/shared';
+import type { WorkflowDefinition, WorkflowEdge } from '@garage-engine/shared';
 
 export class GraphResolver {
   private adjacencyList: Map<string, string[]>;

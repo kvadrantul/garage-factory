@@ -1,4 +1,4 @@
-import type { NodeResult } from '@orchestrator/shared';
+import type { NodeResult } from '@garage-engine/shared';
 
 export class StateManager {
   private nodeResults: Map<string, NodeResult>;

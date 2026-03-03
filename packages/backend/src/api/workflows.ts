@@ -6,7 +6,7 @@ import { eq, desc } from 'drizzle-orm';
 import { getExecutionService } from '../services/execution-service.js';
 import { getScheduler } from '../services/scheduler.js';
 import { registerWebhooksForWorkflow, unregisterWebhooksForWorkflow } from '../webhooks/webhook-handler.js';
-import type { WorkflowDefinition, WorkflowSettings } from '@orchestrator/shared';
+import type { WorkflowDefinition, WorkflowSettings } from '@garage-engine/shared';
 
 export const workflowsRouter: RouterType = Router();
 

@@ -1,4 +1,4 @@
-import type { NodeRunner, NodeContext, NodeResult } from '@orchestrator/shared';
+import type { NodeRunner, NodeContext, NodeResult } from '@garage-engine/shared';
 
 export const scheduleTrigger: NodeRunner = {
   async execute(context: NodeContext): Promise<NodeResult> {

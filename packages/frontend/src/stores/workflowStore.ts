@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import type { Node, Edge } from 'reactflow';
-import type { WorkflowDefinition } from '@orchestrator/shared';
+import type { WorkflowDefinition } from '@garage-engine/shared';
 
 interface WorkflowState {
   // Workflow data

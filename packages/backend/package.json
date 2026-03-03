@@ -1,5 +1,5 @@
 {
-  "name": "@orchestrator/backend",
+  "name": "@garage-engine/backend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@orchestrator/shared": "workspace:*",
+    "@garage-engine/shared": "workspace:*",
     "better-sqlite3": "^11.0.0",
     "cors": "^2.8.5",
     "cron": "^4.4.0",

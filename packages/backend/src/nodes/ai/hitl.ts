@@ -1,4 +1,4 @@
-import type { NodeRunner, NodeContext, NodeResult, HITLField } from '@orchestrator/shared';
+import type { NodeRunner, NodeContext, NodeResult, HITLField } from '@garage-engine/shared';
 
 export const hitlNode: NodeRunner = {
   async execute(context: NodeContext): Promise<NodeResult> {

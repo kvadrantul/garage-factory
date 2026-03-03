@@ -1,5 +1,5 @@
 {
-  "name": "@orchestrator/shared",
+  "name": "@garage-engine/shared",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { ExecutionRunner } from '../executor/execution-runner.js';
 import { db, schema } from '../db/index.js';
-import type { TriggerType, WorkflowDefinition, WorkflowSettings } from '@orchestrator/shared';
+import type { TriggerType, WorkflowDefinition, WorkflowSettings } from '@garage-engine/shared';
 
 type BroadcastFn = (executionId: string, event: { type: string; payload: unknown }) => void;
 

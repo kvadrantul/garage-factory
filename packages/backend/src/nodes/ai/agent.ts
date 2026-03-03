@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import type { NodeRunner, NodeContext, NodeResult } from '@orchestrator/shared';
+import type { NodeRunner, NodeContext, NodeResult } from '@garage-engine/shared';
 
 interface AgentConfig {
   agentId?: string;

@@ -1,6 +1,7 @@
 {
-  "name": "orchestrator",
+  "name": "garage-engine",
   "version": "0.1.0",
+  "description": "Visual workflow automation platform with AI agent integration and Human-in-the-Loop capabilities",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +13,7 @@
     "db:migrate": "pnpm --filter backend db:migrate",
     "db:studio": "pnpm --filter backend db:studio",
     "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter backend test",
     "clean": "pnpm -r clean && rm -rf node_modules"
   },
   "devDependencies": {
@@ -21,5 +23,10 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "packageManager": "pnpm@9.0.0"
+  "packageManager": "pnpm@9.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kvadrantul/garage-engine.git"
+  },
+  "license": "MIT"
 }

@@ -1,5 +1,5 @@
 import * as vm from 'node:vm';
-import type { NodeRunner, NodeContext, NodeResult } from '@orchestrator/shared';
+import type { NodeRunner, NodeContext, NodeResult } from '@garage-engine/shared';
 
 const CODE_TIMEOUT_MS = 10000;
 

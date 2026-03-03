@@ -15,7 +15,7 @@ import type {
   ExecutionResult,
   HITLRequest,
   HITLResponse,
-} from '@orchestrator/shared';
+} from '@garage-engine/shared';
 
 export class ExecutionRunner extends EventEmitter {
   private graphResolver: GraphResolver;

@@ -1,4 +1,4 @@
-import type { NodeRunner } from '@orchestrator/shared';
+import type { NodeRunner } from '@garage-engine/shared';
 import { manualTrigger } from './triggers/manual.js';
 import { webhookTrigger } from './triggers/webhook.js';
 import { scheduleTrigger } from './triggers/schedule.js';

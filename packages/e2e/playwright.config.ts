@@ -27,14 +27,14 @@ export default defineConfig({
 
   webServer: [
     {
-      command: `PORT=${BACKEND_PORT} pnpm --filter @orchestrator/backend dev`,
+      command: `PORT=${BACKEND_PORT} pnpm --filter @garage-engine/backend dev`,
       url: `http://localhost:${BACKEND_PORT}/api/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
       cwd: '../..',
     },
     {
-      command: `pnpm --filter @orchestrator/frontend dev`,
+      command: `pnpm --filter @garage-engine/frontend dev`,
       url: `http://localhost:${FRONTEND_PORT}`,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,

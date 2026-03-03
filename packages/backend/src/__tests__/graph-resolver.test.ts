@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GraphResolver } from '../executor/graph-resolver.js';
-import type { WorkflowDefinition } from '@orchestrator/shared';
+import type { WorkflowDefinition } from '@garage-engine/shared';
 
 function makeDefinition(
   nodes: { id: string }[],

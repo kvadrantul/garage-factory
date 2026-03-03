@@ -3,7 +3,7 @@ import { ifNode } from '../nodes/logic/if.js';
 import { switchNode } from '../nodes/logic/switch.js';
 import { mergeNode } from '../nodes/logic/merge.js';
 import { setNode } from '../nodes/actions/set.js';
-import type { NodeContext, WorkflowNode } from '@orchestrator/shared';
+import type { NodeContext, WorkflowNode } from '@garage-engine/shared';
 
 function makeContext(
   config: Record<string, unknown>,

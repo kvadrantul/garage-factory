@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { WorkflowDefinition, NodeRunner, NodeContext, NodeResult } from '@orchestrator/shared';
+import type { WorkflowDefinition, NodeRunner, NodeContext, NodeResult } from '@garage-engine/shared';
 
 // ── Mocks ──────────────────────────────────────────────
 
