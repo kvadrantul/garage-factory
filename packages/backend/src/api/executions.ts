@@ -3,6 +3,7 @@
 import { Router, type Router as RouterType } from 'express';
 import { db, schema } from '../db/index.js';
 import { eq, desc, and } from 'drizzle-orm';
+import { getExecutionService } from '../services/execution-service.js';
 
 export const executionsRouter: RouterType = Router();
 
@@ -109,10 +110,7 @@ executionsRouter.post('/:id/stop', async (req, res) => {
       return res.status(400).json({ error: { code: 'INVALID_STATE', message: 'Execution already finished' } });
     }
 
-    await db
-      .update(schema.executions)
-      .set({ status: 'stopped', finishedAt: new Date() })
-      .where(eq(schema.executions.id, id));
+    await getExecutionService().stopExecution(id);
 
     res.json({ id, status: 'stopped' });
   } catch (error) {

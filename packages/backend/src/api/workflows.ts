@@ -3,6 +3,9 @@
 import { Router, type Router as RouterType } from 'express';
 import { db, schema } from '../db/index.js';
 import { eq, desc } from 'drizzle-orm';
+import { getExecutionService } from '../services/execution-service.js';
+import { getScheduler } from '../services/scheduler.js';
+import { registerWebhooksForWorkflow, unregisterWebhooksForWorkflow } from '../webhooks/webhook-handler.js';
 import type { WorkflowDefinition, WorkflowSettings } from '@orchestrator/shared';
 
 export const workflowsRouter: RouterType = Router();
@@ -164,29 +167,10 @@ workflowsRouter.post('/:id/execute', async (req, res) => {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Workflow not found' } });
     }
 
-    // Create execution record
-    const now = new Date();
-    const execution = await db
-      .insert(schema.executions)
-      .values({
-        workflowId: id,
-        status: 'running',
-        triggerType: 'manual',
-        triggerData,
-        startedAt: now,
-        createdAt: now,
-      })
-      .returning()
-      .get();
+    const service = getExecutionService();
+    const { executionId } = await service.executeWorkflow(id, 'manual', triggerData ?? {});
 
-    // TODO: Actually execute the workflow via ExecutionRunner
-    // For now, just mark as completed
-    await db
-      .update(schema.executions)
-      .set({ status: 'completed', finishedAt: new Date() })
-      .where(eq(schema.executions.id, execution.id));
-
-    res.json({ executionId: execution.id, status: 'running' });
+    res.json({ executionId, status: 'running' });
   } catch (error) {
     console.error('Error executing workflow:', error);
     res.status(500).json({ error: { code: 'EXECUTION_FAILED', message: 'Failed to execute workflow' } });
@@ -198,16 +182,29 @@ workflowsRouter.post('/:id/activate', async (req, res) => {
   try {
     const { id } = req.params;
 
+    const workflow = await db
+      .select()
+      .from(schema.workflows)
+      .where(eq(schema.workflows.id, id))
+      .get();
+
+    if (!workflow) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Workflow not found' } });
+    }
+
+    // Register webhooks for this workflow
+    await registerWebhooksForWorkflow(id, workflow.definition);
+
+    // Register schedule jobs for this workflow
+    const scheduler = getScheduler();
+    await scheduler.registerWorkflowSchedules(id, workflow.definition);
+
     const result = await db
       .update(schema.workflows)
       .set({ active: true, updatedAt: new Date() })
       .where(eq(schema.workflows.id, id))
       .returning()
       .get();
-
-    if (!result) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Workflow not found' } });
-    }
 
     res.json(result);
   } catch (error) {
@@ -220,6 +217,13 @@ workflowsRouter.post('/:id/activate', async (req, res) => {
 workflowsRouter.post('/:id/deactivate', async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Unregister webhooks for this workflow
+    await unregisterWebhooksForWorkflow(id);
+
+    // Unregister schedule jobs for this workflow
+    const scheduler = getScheduler();
+    scheduler.unregisterWorkflow(id);
 
     const result = await db
       .update(schema.workflows)

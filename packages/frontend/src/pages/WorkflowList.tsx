@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Play, Trash2, MoreVertical } from 'lucide-react';
+import { Plus, Play, Trash2 } from 'lucide-react';
 import { workflowsApi } from '@/api/client';
 
 export function WorkflowList() {
@@ -32,7 +32,20 @@ export function WorkflowList() {
       {/* Header */}
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Orchestrator</h1>
+          <div className="flex items-center gap-6">
+            <h1 className="text-2xl font-bold text-gray-900">Orchestrator</h1>
+            <nav className="flex items-center gap-4">
+              <Link to="/workflows" className="text-blue-600 font-medium">
+                Workflows
+              </Link>
+              <Link to="/executions" className="text-gray-600 hover:text-gray-900">
+                Executions
+              </Link>
+              <Link to="/hitl" className="text-gray-600 hover:text-gray-900">
+                HITL Requests
+              </Link>
+            </nav>
+          </div>
           <button
             onClick={handleCreate}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"

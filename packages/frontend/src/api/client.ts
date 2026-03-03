@@ -83,3 +83,28 @@ export const hitlApi = {
       body: JSON.stringify(response),
     }),
 };
+
+// Credentials API
+export const credentialsApi = {
+  list: (params?: { limit?: number; offset?: number }) =>
+    request<{ data: any[]; total: number }>(`/credentials?${new URLSearchParams(params as any)}`),
+
+  get: (id: string) => request<any>(`/credentials/${id}`),
+
+  create: (data: { name: string; type: string; data: Record<string, unknown> }) =>
+    request<any>('/credentials', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: { name?: string; type?: string; data?: Record<string, unknown> }) =>
+    request<any>(`/credentials/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    request<void>(`/credentials/${id}`, {
+      method: 'DELETE',
+    }),
+};

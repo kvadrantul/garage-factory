@@ -56,7 +56,7 @@ export function NodeConfigPanel() {
         </div>
 
         {/* Node-specific config */}
-        <NodeConfig type={node.type} config={node.data.config} onChange={handleConfigChange} />
+        <NodeConfig type={node.type || ''} config={node.data.config} onChange={handleConfigChange} />
       </div>
     </div>
   );
@@ -121,12 +121,45 @@ function NodeConfig({
       return (
         <>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Agent ID</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Provider</label>
+            <select
+              value={config.provider || 'openai'}
+              onChange={(e) => onChange('provider', e.target.value)}
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="openai">OpenAI</option>
+              <option value="openclaw">OpenClaw CLI</option>
+            </select>
+          </div>
+          {config.provider === 'openclaw' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Agent ID</label>
+              <input
+                type="text"
+                value={config.agentId || ''}
+                onChange={(e) => onChange('agentId', e.target.value)}
+                placeholder="agent-xxx"
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Model</label>
             <input
               type="text"
-              value={config.agentId || ''}
-              onChange={(e) => onChange('agentId', e.target.value)}
-              placeholder="agent-xxx"
+              value={config.model || ''}
+              onChange={(e) => onChange('model', e.target.value)}
+              placeholder={config.provider === 'openclaw' ? 'claude-3-5-sonnet' : 'gpt-4o-mini'}
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">System Prompt</label>
+            <textarea
+              value={config.systemPrompt || ''}
+              onChange={(e) => onChange('systemPrompt', e.target.value)}
+              placeholder="You are a helpful assistant..."
+              rows={3}
               className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -135,8 +168,33 @@ function NodeConfig({
             <textarea
               value={config.message || ''}
               onChange={(e) => onChange('message', e.target.value)}
-              placeholder="Message to send to agent"
+              placeholder="Message to send (or leave empty to use input)"
               rows={4}
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          {config.provider !== 'openclaw' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Temperature: {config.temperature ?? 0.7}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={config.temperature ?? 0.7}
+                onChange={(e) => onChange('temperature', parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Timeout (seconds)</label>
+            <input
+              type="number"
+              value={config.timeout || 180}
+              onChange={(e) => onChange('timeout', parseInt(e.target.value))}
               className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
