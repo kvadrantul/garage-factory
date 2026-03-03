@@ -4,6 +4,7 @@ import { WorkflowEditor } from './pages/WorkflowEditor';
 import { ExecutionList } from './pages/ExecutionList';
 import { ExecutionDetail } from './pages/ExecutionDetail';
 import { HITLList } from './pages/HITLList';
+import { CredentialsList } from './pages/CredentialsList';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/executions" element={<ExecutionList />} />
         <Route path="/executions/:id" element={<ExecutionDetail />} />
         <Route path="/hitl" element={<HITLList />} />
+        <Route path="/credentials" element={<CredentialsList />} />
       </Routes>
     </div>
   );

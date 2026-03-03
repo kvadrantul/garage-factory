@@ -43,6 +43,18 @@ export class StateManager {
     return this.failedNodes.has(nodeId);
   }
 
+  /**
+   * Get all node results as a map of nodeName -> output data.
+   * Used for $node["name"] expression resolution.
+   */
+  getAllNodeResults(): Record<string, unknown> {
+    const results: Record<string, unknown> = {};
+    for (const [nodeId, result] of this.nodeResults) {
+      results[nodeId] = result.data;
+    }
+    return results;
+  }
+
   reset(): void {
     this.nodeResults.clear();
     this.outputIndices.clear();

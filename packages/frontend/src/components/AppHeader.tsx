@@ -2,6 +2,17 @@ import { Link, useLocation } from 'react-router-dom';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 
+function GarageLogo() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="2" width="12" height="12" rx="2" fill="#F97316" />
+      <rect x="18" y="2" width="12" height="12" rx="2" fill="#F97316" />
+      <rect x="2" y="18" width="12" height="12" rx="2" fill="#F97316" />
+      <rect x="18" y="18" width="12" height="12" rx="2" fill="#F97316" opacity="0.4" />
+    </svg>
+  );
+}
+
 export function AppHeader({ children }: { children?: React.ReactNode }) {
   const location = useLocation();
   const { theme, toggle } = useTheme();
@@ -26,12 +37,15 @@ export function AppHeader({ children }: { children?: React.ReactNode }) {
     <header className="bg-card border-b border-border">
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <Link to="/workflows" className="text-2xl font-bold text-foreground">
-            Orchestrator
+          <Link to="/workflows" className="flex items-center gap-2">
+            <GarageLogo />
+            <span className="text-xl font-bold text-foreground">Garage</span>
+            <span className="text-xl font-light text-muted-foreground">Tools</span>
           </Link>
           <nav className="flex items-center gap-4">
             {navLink('/workflows', 'Workflows')}
             {navLink('/executions', 'Executions')}
+            {navLink('/credentials', 'Credentials')}
             {navLink('/hitl', 'HITL Requests')}
           </nav>
         </div>

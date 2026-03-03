@@ -14,14 +14,16 @@ import ReactFlow, {
   type Node,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Save, Play, ArrowLeft, Moon, Sun } from 'lucide-react';
+import { Save, Play, ArrowLeft, Moon, Sun, History } from 'lucide-react';
 import { workflowsApi } from '@/api/client';
 import { NodePalette } from '@/components/canvas/NodePalette';
-import { NodeConfigPanel } from '@/components/panels/NodeConfigPanel';
+import { NDVPanel } from '@/components/panels/NDVPanel';
 import { HITLPanel } from '@/components/panels/HITLPanel';
+import { ExecutionHistorySidebar } from '@/components/panels/ExecutionHistorySidebar';
 import { WorkflowNode } from '@/components/nodes/WorkflowNode';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useTheme } from '@/hooks/useTheme';
+import { useToast } from '@/components/ui/Toast';
 
 interface HITLRequest {
   id: string;
@@ -59,7 +61,9 @@ export function WorkflowEditor() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [hitlRequest, setHitlRequest] = useState<HITLRequest | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const { theme, toggle: toggleTheme } = useTheme();
+  const { toast } = useToast();
 
   // Register all node types to use the same custom component
   const nodeTypes = useMemo(
@@ -113,6 +117,14 @@ export function WorkflowEditor() {
               : n,
           ),
         );
+        // Animate edges leading TO this node (data flowing in)
+        setEdges((eds) =>
+          eds.map((e) =>
+            e.target === nodeId
+              ? { ...e, animated: true, style: { stroke: '#3b82f6', strokeWidth: 2 } }
+              : e,
+          ),
+        );
       }
 
       if (type === 'execution:node:completed') {
@@ -134,11 +146,11 @@ export function WorkflowEditor() {
             };
           }),
         );
-        // Animate the edge from this node
+        // Animate the edge from this node (data flowing out, success)
         setEdges((eds) =>
           eds.map((e) =>
             e.source === nodeId
-              ? { ...e, animated: true, style: { stroke: '#22c55e' } }
+              ? { ...e, animated: true, style: { stroke: '#22c55e', strokeWidth: 2 } }
               : e,
           ),
         );
@@ -164,7 +176,7 @@ export function WorkflowEditor() {
         setEdges((eds) =>
           eds.map((e) =>
             e.source === nodeId
-              ? { ...e, animated: false, style: { stroke: '#ef4444' } }
+              ? { ...e, animated: false, style: { stroke: '#ef4444', strokeWidth: 2 } }
               : e,
           ),
         );
@@ -199,9 +211,18 @@ export function WorkflowEditor() {
       if (type === 'execution:completed' || type === 'execution:failed') {
         setExecutionId(null);
         setHitlRequest(null);
+        if (type === 'execution:completed') {
+          toast({ title: 'Execution completed', variant: 'success' });
+        } else {
+          toast({
+            title: 'Execution failed',
+            description: (payload.error as string) || 'Unknown error',
+            variant: 'destructive',
+          });
+        }
       }
     },
-    [setNodes, setEdges],
+    [setNodes, setEdges, toast],
   );
 
   const { subscribe, unsubscribe } = useWebSocket(wsMessageHandler);
@@ -273,12 +294,29 @@ export function WorkflowEditor() {
     onSuccess: (result: any) => {
       // Clear previous execution status from nodes
       setNodes((nds) =>
-        nds.map((n) => ({ ...n, data: { ...n.data, executionStatus: 'pending' } })),
+        nds.map((n) => ({
+          ...n,
+          data: {
+            ...n.data,
+            executionStatus: 'pending',
+            executionOutput: undefined,
+            executionError: undefined,
+            executionDuration: undefined,
+          },
+        })),
+      );
+      // Reset edge styles
+      setEdges((eds) =>
+        eds.map((e) => ({ ...e, animated: false, style: undefined })),
       );
       // Subscribe to execution events
       const execId = result.executionId;
       setExecutionId(execId);
       subscribe(execId);
+      toast({ title: 'Workflow started', variant: 'default' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to start', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -387,6 +425,19 @@ export function WorkflowEditor() {
               Run
             </button>
           )}
+          {!isNew && (
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={`p-2 rounded transition-colors ${
+                showHistory 
+                  ? 'bg-accent text-foreground' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              }`}
+              title="Execution History"
+            >
+              <History size={16} />
+            </button>
+          )}
           <button
             onClick={toggleTheme}
             className="p-2 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -423,11 +474,23 @@ export function WorkflowEditor() {
 
         {/* Config Panel */}
         {selectedNodeId && (
-          <NodeConfigPanel
+          <NDVPanel
             nodeId={selectedNodeId}
             nodes={nodes}
             setNodes={setNodes}
             onClose={() => setSelectedNodeId(null)}
+          />
+        )}
+
+        {/* Execution History Sidebar */}
+        {showHistory && id && (
+          <ExecutionHistorySidebar
+            workflowId={id}
+            currentExecutionId={executionId}
+            onSelectExecution={(execId) => {
+              // TODO: Load execution details and visualize node states
+              console.log('Selected execution:', execId);
+            }}
           />
         )}
       </div>

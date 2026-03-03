@@ -50,12 +50,34 @@ export const api = {
     return request(`/api/executions/${id}`, { method: 'DELETE' });
   },
 
-  /** Delete all workflows whose name starts with [E2E] */
+  async listCredentials(): Promise<{ data: { id: string; name: string }[] }> {
+    return request('/api/credentials');
+  },
+
+  async createCredential(name: string, type: string, data: unknown): Promise<{ id: string }> {
+    const result = await request<{ id: string }>('/api/credentials', {
+      method: 'POST',
+      body: JSON.stringify({ name, type, data }),
+    });
+    return { id: result.id };
+  },
+
+  async deleteCredential(id: string): Promise<void> {
+    return request(`/api/credentials/${id}`, { method: 'DELETE' });
+  },
+
+  /** Delete all workflows and credentials whose name starts with [E2E] */
   async cleanupStale(): Promise<void> {
-    const { data } = await this.listWorkflows();
-    for (const wf of data) {
+    const { data: workflows } = await this.listWorkflows();
+    for (const wf of workflows) {
       if (wf.name.startsWith('[E2E]')) {
         await this.deleteWorkflow(wf.id).catch(() => {});
+      }
+    }
+    const { data: credentials } = await this.listCredentials();
+    for (const cred of credentials) {
+      if (cred.name.startsWith('[E2E]')) {
+        await this.deleteCredential(cred.id).catch(() => {});
       }
     }
   },

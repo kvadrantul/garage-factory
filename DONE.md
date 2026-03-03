@@ -1,4 +1,4 @@
-# Orchestrator -- Status: What's Done
+# Garage Tools -- Status: What's Done
 
 Visual workflow automation platform with AI agent integration and Human-in-the-Loop (HITL).
 
@@ -199,3 +199,49 @@ Original specifications in `specs/`:
 | `NODES.md` | All 11 node types with interfaces and implementations |
 | `EXECUTOR.md` | Execution engine design, HITL handling, scheduler, webhook handler |
 | `FRONTEND.md` | React components, stores, hooks, pages |
+
+---
+
+## Recent Enhancements
+
+### Expression Resolver (`packages/backend/src/executor/expression-resolver.ts`)
+
+Extended n8n-compatible expression syntax:
+
+| Expression | Description |
+|------------|-------------|
+| `{{ $input.path }}` | Access upstream node output |
+| `{{ $json.path }}` | Alias for $input (n8n compatibility) |
+| `{{ $node["nodeName"].json.path }}` | Reference specific node output |
+| `{{ $vars.varName }}` | Workflow-level variables |
+| `{{ $env.VAR_NAME }}` | Environment variables |
+
+### Credentials Integration
+
+- HTTP nodes can select credentials from dropdown
+- Backend automatically loads and applies credentials:
+  - `api_key` - adds custom header
+  - `bearer_token` - adds Authorization Bearer header
+  - `basic_auth` - adds Authorization Basic header
+- Credentials page (`/credentials`) with CRUD operations
+
+### NDV Panel (Node Detail View)
+
+n8n-style node inspector panel:
+- **Settings tab**: Node configuration with type-specific forms
+- **Output tab**: Execution results with status, duration, input/output data
+- Collapsible JSON data sections
+
+### Execution History Sidebar
+
+- Toggle via History button in editor toolbar
+- Shows last 20 executions for current workflow
+- Status icons, trigger type, duration
+- Auto-refresh during active execution
+
+### Enhanced Execution Visualization
+
+- Blue ring + shadow on running nodes
+- Green ring on completed nodes
+- Animated edges during data flow (blue incoming, green outgoing)
+- Edge reset on new execution start

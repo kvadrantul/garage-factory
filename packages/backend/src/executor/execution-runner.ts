@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { GraphResolver } from './graph-resolver.js';
 import { StateManager } from './state-manager.js';
 import { AbortedError, NodeExecutionError } from './errors.js';
+import { resolveExpressions, type ExpressionContext } from './expression-resolver.js';
 import { nodeRegistry } from '../nodes/registry.js';
 import { db, schema } from '../db/index.js';
 import type {
@@ -126,10 +127,28 @@ export class ExecutionRunner extends EventEmitter {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
+        // Build expression context with all node results for $node["name"] support
+        const expressionContext: ExpressionContext = {
+          input: inputData,
+          nodeResults: this.stateManager.getAllNodeResults(),
+          workflowVars: this.definition.settings?.variables as Record<string, unknown>,
+          env: process.env as Record<string, string>,
+        };
+
+        // Resolve expressions in node config
+        const resolvedConfig = resolveExpressions(node.data.config, expressionContext) as Record<string, unknown>;
+        const resolvedNode = { ...node, data: { ...node.data, config: resolvedConfig } };
+
+        // Load credentials if specified
+        let credentials: Record<string, unknown> | undefined;
+        if (resolvedConfig.credentialId) {
+          credentials = await this.loadCredentials(resolvedConfig.credentialId as string);
+        }
+
         const context: NodeContext = {
-          node,
+          node: resolvedNode,
           inputs: { main: [inputData] },
-          credentials: undefined,
+          credentials,
           execution: { id: executionId, workflowId: this.workflowId },
           helpers: this.createHelpers(),
           emit: (event: string, data: unknown) =>
@@ -229,6 +248,31 @@ export class ExecutionRunner extends EventEmitter {
       .filter((d) => d !== null);
 
     return results.length === 1 ? results[0] : results;
+  }
+
+  private async loadCredentials(credentialId: string): Promise<Record<string, unknown> | undefined> {
+    try {
+      const credential = await db
+        .select()
+        .from(schema.credentials)
+        .where(eq(schema.credentials.id, credentialId))
+        .get();
+
+      if (!credential) {
+        console.warn(`Credential ${credentialId} not found`);
+        return undefined;
+      }
+
+      // Parse the encrypted data buffer
+      const data = JSON.parse(credential.data.toString('utf-8'));
+      return {
+        type: credential.type,
+        ...data,
+      };
+    } catch (error) {
+      console.error(`Failed to load credential ${credentialId}:`, error);
+      return undefined;
+    }
   }
 
   private async handleHitl(

@@ -1,4 +1,4 @@
-# Orchestrator -- TODO: Remaining Work
+# Garage Tools -- TODO: Remaining Work
 
 Items below are needed to complete the MVP as described in `specs/SPEC.md`.
 Ordered by priority -- higher items unblock more functionality.

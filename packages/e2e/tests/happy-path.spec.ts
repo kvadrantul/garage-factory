@@ -23,7 +23,7 @@ test.describe('Happy path: create → run → view results', () => {
   test('execute workflow from list and verify results on detail page', async ({ page }) => {
     // 1. Navigate to workflows list
     await page.goto('/workflows');
-    await expect(page.locator('text=Orchestrator')).toBeVisible();
+    await expect(page.locator('text=Garage')).toBeVisible();
 
     // 2. Assert our workflow card is visible
     const workflowCard = page.locator(`text=${WF_NAME}`).first();

@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import {
   Webhook,
@@ -11,8 +11,6 @@ import {
   Bot,
   UserCheck,
   Settings,
-  ChevronDown,
-  ChevronUp,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -46,10 +44,10 @@ const categoryColors: Record<string, { bg: string; border: string; icon: string 
 
 const statusStyles: Record<string, string> = {
   pending: '',
-  running: 'ring-2 ring-blue-400 ring-offset-1 animate-pulse',
-  completed: 'ring-2 ring-green-400 ring-offset-1',
-  error: 'ring-2 ring-red-400 ring-offset-1',
-  waiting_hitl: 'ring-2 ring-amber-400 ring-offset-1 animate-pulse',
+  running: 'ring-2 ring-blue-500 ring-offset-2 ring-offset-background shadow-lg shadow-blue-500/20',
+  completed: 'ring-2 ring-green-500 ring-offset-2 ring-offset-background',
+  error: 'ring-2 ring-red-500 ring-offset-2 ring-offset-background',
+  waiting_hitl: 'ring-2 ring-amber-500 ring-offset-2 ring-offset-background',
   skipped: 'opacity-50',
 };
 
@@ -63,11 +61,9 @@ const multiOutputTypes: Record<string, string[]> = {
 };
 
 function WorkflowNodeComponent({ data, type, selected }: NodeProps) {
-  const [showOutput, setShowOutput] = useState(false);
   const Icon = iconMap[type || ''] || Settings;
   const colors = categoryColors[type || ''] || categoryColors['set'];
   const status = data?.executionStatus as string | undefined;
-  const output = data?.executionOutput;
   const error = data?.executionError as string | undefined;
   const duration = data?.executionDuration as number | undefined;
   const isTrigger = triggerTypes.has(type || '');
@@ -141,31 +137,7 @@ function WorkflowNodeComponent({ data, type, selected }: NodeProps) {
             {error}
           </div>
         )}
-
-        {/* Output toggle */}
-        {(output || error) && status !== 'running' && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowOutput(!showOutput);
-            }}
-            className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {showOutput ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-            {showOutput ? 'Hide output' : 'Show output'}
-          </button>
-        )}
       </div>
-
-      {/* Output panel */}
-      {showOutput && output && (
-        <div className="border-t border-border px-2 py-1 max-h-32 overflow-auto bg-card/50">
-          <pre className="text-[9px] text-muted-foreground whitespace-pre-wrap break-all">
-            {JSON.stringify(output, null, 2).slice(0, 500)}
-            {JSON.stringify(output).length > 500 && '...'}
-          </pre>
-        </div>
-      )}
 
       {/* Output handles */}
       {outputs ? (
