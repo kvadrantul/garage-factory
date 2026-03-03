@@ -74,7 +74,7 @@ export function WorkflowEditor() {
 
   // Register custom edge type with delete button
   const edgeTypes = useMemo(
-    () => ({ default: DeletableEdge }),
+    () => ({ deletable: DeletableEdge }),
     [],
   );
 
@@ -283,6 +283,7 @@ export function WorkflowEditor() {
       setEdges(
         workflow.definition.edges.map((e: any) => ({
           ...e,
+          type: 'deletable',
           data: { ...e.data, onDelete: deleteEdge },
         })),
       );
@@ -359,7 +360,7 @@ export function WorkflowEditor() {
   // Connection handler
   const onConnect = useCallback(
     (connection: Connection) => {
-      setEdges((eds) => addEdge({ ...connection, data: { onDelete: deleteEdge } }, eds));
+      setEdges((eds) => addEdge({ ...connection, type: 'deletable', data: { onDelete: deleteEdge } }, eds));
     },
     [setEdges, deleteEdge],
   );
