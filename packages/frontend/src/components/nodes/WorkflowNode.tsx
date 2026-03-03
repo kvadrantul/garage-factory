@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import {
   Webhook,
@@ -11,6 +11,7 @@ import {
   Bot,
   UserCheck,
   Settings,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -60,7 +61,8 @@ const multiOutputTypes: Record<string, string[]> = {
   'switch': ['Case 0', 'Case 1', 'Case 2', 'Default'],
 };
 
-function WorkflowNodeComponent({ data, type, selected }: NodeProps) {
+function WorkflowNodeComponent({ id, data, type, selected }: NodeProps) {
+  const [isHovered, setIsHovered] = useState(false);
   const Icon = iconMap[type || ''] || Settings;
   const colors = categoryColors[type || ''] || categoryColors['set'];
   const status = data?.executionStatus as string | undefined;
@@ -68,22 +70,43 @@ function WorkflowNodeComponent({ data, type, selected }: NodeProps) {
   const duration = data?.executionDuration as number | undefined;
   const isTrigger = triggerTypes.has(type || '');
   const outputs = multiOutputTypes[type || ''];
+  const onDelete = data?.onDelete as ((nodeId: string) => void) | undefined;
 
   const formatDuration = (ms: number) => {
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
   };
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete) {
+      onDelete(id);
+    }
+  };
+
   return (
     <div
       className={`
         ${colors.bg} ${colors.border} border rounded-lg shadow-sm
-        min-w-[160px] max-w-[220px]
+        min-w-[160px] max-w-[220px] relative group
         ${selected ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
         ${status ? statusStyles[status] || '' : ''}
         transition-all duration-200
       `}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Delete button - appears on hover */}
+      {isHovered && onDelete && (
+        <button
+          onClick={handleDelete}
+          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md z-10 transition-colors"
+          title="Delete node"
+        >
+          <X size={12} />
+        </button>
+      )}
+
       {/* Input handle */}
       {!isTrigger && (
         <Handle

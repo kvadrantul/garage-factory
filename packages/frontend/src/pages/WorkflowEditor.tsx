@@ -96,6 +96,17 @@ export function WorkflowEditor() {
     [onEdgesChange],
   );
 
+  // Delete node handler (defined early for use in node data)
+  const deleteNode = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+      setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+      setSelectedNodeId(null);
+      setIsDirty(true);
+    },
+    [setNodes, setEdges],
+  );
+
   // WebSocket for real-time execution updates
   const wsMessageHandler = useCallback(
     (event: { type: string; payload: Record<string, unknown> }) => {
@@ -250,24 +261,28 @@ export function WorkflowEditor() {
           id: n.id,
           type: n.type,
           position: n.position,
-          data: n.data,
+          data: { ...n.data, onDelete: deleteNode },
         })),
       );
       setEdges(workflow.definition.edges);
       setIsDirty(false);
     }
-  }, [workflow, setNodes, setEdges]);
+  }, [workflow, setNodes, setEdges, deleteNode]);
 
   // Save workflow
   const saveMutation = useMutation({
     mutationFn: async () => {
       const definition = {
-        nodes: nodes.map((n) => ({
-          id: n.id,
-          type: n.type,
-          position: n.position,
-          data: n.data,
-        })),
+        nodes: nodes.map((n) => {
+          // Strip out onDelete callback before saving
+          const { onDelete, ...dataWithoutCallbacks } = n.data;
+          return {
+            id: n.id,
+            type: n.type,
+            position: n.position,
+            data: dataWithoutCallbacks,
+          };
+        }),
         edges: edges.map((e) => ({
           id: e.id,
           source: e.source,
@@ -341,17 +356,6 @@ export function WorkflowEditor() {
     setSelectedNodeId(null);
   }, []);
 
-  // Delete node handler
-  const deleteNode = useCallback(
-    (nodeId: string) => {
-      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-      setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
-      setSelectedNodeId(null);
-      setIsDirty(true);
-    },
-    [setNodes, setEdges],
-  );
-
   // Keyboard delete handler
   const onNodesDelete = useCallback(
     (deleted: Node[]) => {
@@ -390,12 +394,12 @@ export function WorkflowEditor() {
         id: `${type}_${Date.now()}`,
         type,
         position,
-        data: { name: type, config: {} },
+        data: { name: type, config: {}, onDelete: deleteNode },
       };
 
       setNodes((nds) => [...nds, newNode]);
     },
-    [setNodes],
+    [setNodes, deleteNode],
   );
 
   if (isLoading) {
