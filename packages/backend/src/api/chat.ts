@@ -4,10 +4,33 @@
 
 import { Router, type Router as RouterType } from 'express';
 import { spawn } from 'child_process';
+import multer from 'multer';
+import fs from 'node:fs';
+import path from 'node:path';
 import { db, schema } from '../db/index.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { executeWorkflowSync } from '../services/sync-executor.js';
+
+// Multer config for file uploads
+const storage = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    const caseId = req.body.case_id;
+    if (!caseId) {
+      return cb(new Error('case_id is required'), '');
+    }
+    const dir = path.join(process.cwd(), 'uploads', caseId);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (_req, file, cb) => {
+    const safe = file.originalname.replace(/[/\\]/g, '_');
+    const name = `${Date.now()}-${safe}`;
+    cb(null, name);
+  },
+});
+
+const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
 export const chatRouter: RouterType = Router();
 
@@ -375,6 +398,244 @@ chatRouter.post('/send', async (req, res) => {
     console.error('Error sending chat message:', error);
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: 'Failed to send message' },
+    });
+  }
+});
+
+/**
+ * POST /api/chat/upload
+ * Upload files (optionally with a message) to a case.
+ * If message is provided, runs the agent loop as /send does.
+ * If only files, creates file_upload step and returns.
+ */
+chatRouter.post('/upload', upload.array('files', 10), async (req, res) => {
+  try {
+    const { case_id, message } = req.body as {
+      case_id: string;
+      message?: string;
+    };
+    const files = req.files as Express.Multer.File[] | undefined;
+
+    if (!case_id) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'case_id is required' },
+      });
+    }
+
+    if ((!files || files.length === 0) && !message?.trim()) {
+      return res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'At least one file or a message is required' },
+      });
+    }
+
+    // Get case with domain info
+    const caseRecord = await db
+      .select()
+      .from(schema.cases)
+      .where(eq(schema.cases.id, case_id))
+      .get();
+
+    if (!caseRecord) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Case not found' },
+      });
+    }
+
+    const domain = await db
+      .select()
+      .from(schema.domains)
+      .where(eq(schema.domains.id, caseRecord.domainId))
+      .get();
+
+    if (!domain) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Domain not found' },
+      });
+    }
+
+    // Get current step count
+    const stepCountResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.caseSteps)
+      .where(eq(schema.caseSteps.caseId, case_id))
+      .get();
+    let stepIndex = stepCountResult?.count || 0;
+
+    // Save file_upload step if files were uploaded
+    if (files && files.length > 0) {
+      const fileData = files.map((f) => ({
+        name: f.filename,
+        originalName: f.originalname,
+        size: f.size,
+        mimeType: f.mimetype,
+        path: `uploads/${case_id}/${f.filename}`,
+      }));
+
+      await db.insert(schema.caseSteps).values({
+        id: nanoid(16),
+        caseId: case_id,
+        stepIndex: stepIndex++,
+        type: 'file_upload',
+        content: JSON.stringify({ files: fileData }),
+        createdAt: new Date(),
+      });
+    }
+
+    // If no message, return upload-only response
+    if (!message?.trim()) {
+      return res.json({ upload_only: true });
+    }
+
+    // --- From here, same logic as /send ---
+
+    if (!domain.agentId) {
+      return res.status(400).json({
+        error: { code: 'NO_AGENT', message: 'Domain has no agent configured' },
+      });
+    }
+
+    // Load available scenarios for tool context
+    const scenarios = await db
+      .select()
+      .from(schema.scenarios)
+      .where(
+        and(
+          eq(schema.scenarios.domainId, domain.id),
+          eq(schema.scenarios.enabled, true),
+        ),
+      );
+
+    // Save user message
+    await db.insert(schema.caseSteps).values({
+      id: nanoid(16),
+      caseId: case_id,
+      stepIndex: stepIndex++,
+      type: 'user_message',
+      content: JSON.stringify({ text: message.trim() }),
+      createdAt: new Date(),
+    });
+
+    // Build message with tool context
+    const toolContext = buildToolContext(scenarios, domain.id, case_id);
+    const enrichedMessage = toolContext ? `${message.trim()}\n${toolContext}` : message.trim();
+
+    // Call agent
+    let response = await callOpenClawAgent(
+      domain.agentId,
+      enrichedMessage,
+      caseRecord.openclawSessionId ?? undefined,
+    );
+
+    if (response.error) {
+      await db.insert(schema.caseSteps).values({
+        id: nanoid(16),
+        caseId: case_id,
+        stepIndex: stepIndex++,
+        type: 'error',
+        content: JSON.stringify({ error: response.error }),
+        createdAt: new Date(),
+      });
+      return res.status(502).json({
+        error: { code: 'AGENT_ERROR', message: response.error },
+      });
+    }
+
+    // Update session ID
+    if (!caseRecord.openclawSessionId && response.sessionId) {
+      await db
+        .update(schema.cases)
+        .set({ openclawSessionId: response.sessionId, updatedAt: new Date() })
+        .where(eq(schema.cases.id, case_id));
+    }
+    const sessionId = response.sessionId || caseRecord.openclawSessionId;
+
+    // Tool-calling loop (max 3 iterations)
+    for (let i = 0; i < 3; i++) {
+      const toolCall = parseToolCall(response.content);
+      if (!toolCall) break;
+
+      const scenario = scenarios.find((s) => s.toolName === toolCall.tool_name);
+      if (!scenario) {
+        response = await callOpenClawAgent(
+          domain.agentId,
+          `Tool "${toolCall.tool_name}" not found. Available tools: ${scenarios.map((s) => s.toolName).join(', ')}`,
+          sessionId ?? undefined,
+        );
+        continue;
+      }
+
+      await db.insert(schema.caseSteps).values({
+        id: nanoid(16),
+        caseId: case_id,
+        stepIndex: stepIndex++,
+        type: 'tool_call',
+        content: JSON.stringify({ toolName: toolCall.tool_name, inputs: toolCall.inputs, scenarioId: scenario.id }),
+        scenarioId: scenario.id,
+        createdAt: new Date(),
+      });
+
+      let toolResultMessage: string;
+      try {
+        const result = await executeWorkflowSync(
+          scenario.workflowId,
+          'manual',
+          { bridgeInputs: toolCall.inputs, caseId: case_id, scenarioId: scenario.id },
+        );
+
+        await db.insert(schema.caseSteps).values({
+          id: nanoid(16),
+          caseId: case_id,
+          stepIndex: stepIndex++,
+          type: 'tool_result',
+          content: JSON.stringify({ executionId: result.executionId, status: result.status, outputs: result.outputs, error: result.error }),
+          executionId: result.executionId,
+          scenarioId: scenario.id,
+          createdAt: new Date(),
+        });
+
+        if (result.status === 'completed') {
+          toolResultMessage = `Tool "${toolCall.tool_name}" result:\n${JSON.stringify(result.outputs, null, 2)}\n\nNow format this result nicely for the user. Do NOT output a tool_call JSON.`;
+        } else if (result.status === 'failed') {
+          toolResultMessage = `Tool "${toolCall.tool_name}" failed: ${result.error}`;
+        } else {
+          toolResultMessage = `Tool "${toolCall.tool_name}" status: ${result.status}`;
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toolResultMessage = `Tool "${toolCall.tool_name}" execution error: ${msg}`;
+      }
+
+      response = await callOpenClawAgent(
+        domain.agentId,
+        toolResultMessage,
+        sessionId ?? undefined,
+      );
+
+      if (response.error) break;
+    }
+
+    // Save final assistant response
+    await db.insert(schema.caseSteps).values({
+      id: nanoid(16),
+      caseId: case_id,
+      stepIndex: stepIndex++,
+      type: 'assistant_message',
+      content: JSON.stringify({ text: response.content }),
+      createdAt: new Date(),
+    });
+
+    res.json({
+      session_id: sessionId,
+      message: {
+        role: 'assistant',
+        content: response.content,
+      },
+      finish_reason: 'stop',
+    });
+  } catch (error) {
+    console.error('Error uploading files:', error);
+    res.status(500).json({
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to upload files' },
     });
   }
 });

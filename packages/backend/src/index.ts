@@ -2,6 +2,7 @@
 
 import express, { type Express } from 'express';
 import cors from 'cors';
+import path from 'node:path';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { initializeDatabase } from './db/index.js';
@@ -81,6 +82,9 @@ app.use('/api/expert', expertRouter);
 
 // Webhook Handler
 app.use('/webhooks', webhookRouter);
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Health check
 app.get('/api/health', (_req, res) => {

@@ -23,6 +23,24 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json();
 }
 
+async function requestFormData<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
+    throw new Error(error.error?.message || 'Request failed');
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json();
+}
+
 // Workflows API
 export const workflowsApi = {
   list: (params?: { limit?: number; offset?: number }) =>
@@ -256,6 +274,19 @@ export const chatApi = {
       method: 'POST',
       body: JSON.stringify({ case_id: caseId, message }),
     }),
+
+  upload: (caseId: string, message: string, files: File[]) => {
+    const fd = new FormData();
+    fd.append('case_id', caseId);
+    fd.append('message', message);
+    files.forEach((f) => fd.append('files', f));
+    return requestFormData<{
+      session_id?: string;
+      message?: { role: string; content: string };
+      finish_reason?: string;
+      upload_only?: boolean;
+    }>('/chat/upload', fd);
+  },
 
   history: (caseId: string) =>
     request<{ case_id: string; steps: any[] }>(`/chat/history/${caseId}`),

@@ -23,6 +23,10 @@ export default defineConfig({
         target: `ws://localhost:${API_PORT}`,
         ws: true,
       },
+      '/uploads': {
+        target: `http://localhost:${API_PORT}`,
+        changeOrigin: true,
+      },
     },
   },
 });

@@ -8,6 +8,7 @@ import {
   XCircle,
   AlertTriangle,
   Clock,
+  Paperclip,
 } from 'lucide-react';
 
 interface CaseProgressWidgetProps {
@@ -57,6 +58,12 @@ const STEP_CONFIG: Record<string, { label: string; Icon: typeof User; color: str
     color: 'text-red-600 dark:text-red-400',
     dot: 'bg-red-500',
   },
+  file_upload: {
+    label: 'Files uploaded',
+    Icon: Paperclip,
+    color: 'text-indigo-600 dark:text-indigo-400',
+    dot: 'bg-indigo-500',
+  },
 };
 
 function getStepLabel(step: any): string {
@@ -83,6 +90,13 @@ function getStepLabel(step: any): string {
       return content.status === 'approved' ? 'Approved' : 'Rejected';
     case 'error':
       return 'Error';
+    case 'file_upload': {
+      const files = content.files;
+      if (Array.isArray(files)) {
+        return files.length === 1 ? '1 file uploaded' : `${files.length} files uploaded`;
+      }
+      return 'Files uploaded';
+    }
     default:
       return step.type;
   }

@@ -303,7 +303,7 @@ export interface CustomNodeManifest {
 export type RiskClass = 'read_only' | 'write' | 'financial' | 'legal_opinion';
 export type EstimatedDuration = 'fast' | 'medium' | 'long';
 export type CaseStatus = 'open' | 'completed' | 'abandoned';
-export type CaseStepType = 'user_message' | 'assistant_message' | 'tool_call' | 'tool_result' | 'hitl_request' | 'hitl_response' | 'error';
+export type CaseStepType = 'user_message' | 'assistant_message' | 'tool_call' | 'tool_result' | 'hitl_request' | 'hitl_response' | 'error' | 'file_upload';
 
 export interface Domain {
   id: string;

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
-import { Send, ArrowLeft, Loader2, Wrench, CheckCircle, XCircle, AlertTriangle, User, Bot, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Send, ArrowLeft, Loader2, Wrench, CheckCircle, XCircle, AlertTriangle, User, Bot, ThumbsUp, ThumbsDown, Paperclip, FileText, X, Download } from 'lucide-react';
 import { casesApi, chatApi, hitlApi } from '@/api/client';
 import { CasesSidebar } from '@/components/expert/CasesSidebar';
 
@@ -12,8 +12,10 @@ export function CaseChat() {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState('');
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: caseData, isLoading: caseLoading } = useQuery({
     queryKey: ['case', caseId],
@@ -44,6 +46,25 @@ export function CaseChat() {
     },
   });
 
+  const uploadMutation = useMutation({
+    mutationFn: ({ msg, files }: { msg: string; files: File[] }) =>
+      chatApi.upload(caseId!, msg, files),
+    onMutate: ({ msg }) => {
+      setPendingMessage(msg || null);
+      setPendingFiles([]);
+      setMessage('');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-history', caseId] });
+    },
+    onSettled: () => {
+      setPendingMessage(null);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    },
+  });
+
+  const isPending = sendMutation.isPending || uploadMutation.isPending;
+
   // Scroll to bottom on new messages or pending message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -55,8 +76,24 @@ export function CaseChat() {
   }, [caseId]);
 
   const handleSend = () => {
-    if (!message.trim() || sendMutation.isPending) return;
-    sendMutation.mutate(message.trim());
+    if (isPending) return;
+    if (pendingFiles.length > 0) {
+      uploadMutation.mutate({ msg: message.trim(), files: pendingFiles });
+    } else if (message.trim()) {
+      sendMutation.mutate(message.trim());
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setPendingFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
+    }
+    // Reset input so selecting the same file again triggers onChange
+    e.target.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -104,75 +141,121 @@ export function CaseChat() {
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {historyData?.steps.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Start the conversation by sending a message below.</p>
-              <p className="text-sm mt-2">The expert agent will help you with your query.</p>
-            </div>
-          )}
-
-          {historyData?.steps.map((step: any) => (
-            <ChatStep key={step.id} step={step} caseId={caseId!} queryClient={queryClient} />
-          ))}
-
-          {/* Show pending message as immediate user bubble */}
-          {pendingMessage && (
-            <div className="flex items-start gap-3 justify-end">
-              <div className="bg-primary text-primary-foreground rounded-lg p-3 max-w-xl">
-                <p className="text-sm whitespace-pre-wrap">{pendingMessage}</p>
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-4xl mx-auto space-y-4">
+            {historyData?.steps.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>Start the conversation by sending a message below.</p>
+                <p className="text-sm mt-2">The expert agent will help you with your query.</p>
               </div>
-              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                <User size={16} />
+            )}
+
+            {historyData?.steps.map((step: any) => (
+              <ChatStep key={step.id} step={step} caseId={caseId!} queryClient={queryClient} />
+            ))}
+
+            {/* Show pending message as immediate user bubble */}
+            {pendingMessage && (
+              <div className="flex items-start gap-3 justify-end">
+                <div className="bg-primary text-primary-foreground rounded-lg p-3 max-w-xl">
+                  <p className="text-sm whitespace-pre-wrap">{pendingMessage}</p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                  <User size={16} />
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {sendMutation.isPending && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Agent is thinking...</span>
-            </div>
-          )}
+            {isPending && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Agent is thinking...</span>
+              </div>
+            )}
 
-          {sendMutation.isError && (
-            <div className="flex items-center gap-2 text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
-              <AlertTriangle size={18} />
-              <span className="text-sm">
-                {sendMutation.error instanceof Error
-                  ? sendMutation.error.message
-                  : 'Failed to send message'}
-              </span>
-            </div>
-          )}
+            {(sendMutation.isError || uploadMutation.isError) && (
+              <div className="flex items-center gap-2 text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+                <AlertTriangle size={18} />
+                <span className="text-sm">
+                  {(sendMutation.error || uploadMutation.error) instanceof Error
+                    ? (sendMutation.error || uploadMutation.error)!.message
+                    : 'Failed to send message'}
+                </span>
+              </div>
+            )}
 
-          <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
         {/* Input */}
         <div className="p-4 border-t border-border bg-card">
-          <div className="flex gap-2 max-w-4xl mx-auto">
-            <textarea
-              ref={inputRef}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={sendMutation.isPending ? "Agent is processing..." : "Type your message..."}
-              className="flex-1 px-4 py-3 bg-background border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-              rows={1}
-              disabled={caseData?.status !== 'open'}
-            />
-            <button
-              onClick={handleSend}
-              disabled={!message.trim() || sendMutation.isPending || caseData?.status !== 'open'}
-              className="px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {sendMutation.isPending ? (
-                <Loader2 size={20} className="animate-spin" />
-              ) : (
-                <Send size={20} />
-              )}
-            </button>
+          <div className="max-w-4xl mx-auto space-y-2">
+            {/* File chips */}
+            {pendingFiles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {pendingFiles.map((f, i) => (
+                  <div
+                    key={`${f.name}-${i}`}
+                    className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-md text-xs"
+                  >
+                    <FileText size={12} className="text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                    <span className="truncate max-w-[150px] text-indigo-700 dark:text-indigo-300">
+                      {f.name}
+                    </span>
+                    <span className="text-indigo-500 dark:text-indigo-400 flex-shrink-0">
+                      {formatFileSize(f.size)}
+                    </span>
+                    <button
+                      onClick={() => removeFile(i)}
+                      className="ml-0.5 p-0.5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors"
+                    >
+                      <X size={12} className="text-indigo-500" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Input row */}
+            <div className="flex gap-2">
+              <input
+                type="file"
+                multiple
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                className="sr-only"
+                tabIndex={-1}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isPending || caseData?.status !== 'open'}
+                className="px-3 py-3 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
+                title="Attach files"
+              >
+                <Paperclip size={18} />
+              </button>
+              <textarea
+                ref={inputRef}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={isPending ? "Agent is processing..." : "Type your message..."}
+                className="flex-1 px-4 py-3 bg-background border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                rows={1}
+                disabled={caseData?.status !== 'open'}
+              />
+              <button
+                onClick={handleSend}
+                disabled={(!message.trim() && pendingFiles.length === 0) || isPending || caseData?.status !== 'open'}
+                className="px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {isPending ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <Send size={20} />
+                )}
+              </button>
+            </div>
           </div>
           {caseData?.status !== 'open' && (
             <p className="text-center text-sm text-muted-foreground mt-2">
@@ -327,6 +410,46 @@ function ChatStep({ step, caseId, queryClient }: { step: any; caseId: string; qu
             {content.reason && (
               <p className="text-xs mt-1 opacity-75">Reason: {content.reason}</p>
             )}
+          </div>
+        </div>
+      );
+    }
+
+    case 'file_upload': {
+      const fileList = content.files as Array<{ name: string; originalName: string; size: number; mimeType: string; path: string }>;
+      return (
+        <div className="flex items-start gap-3 justify-end">
+          <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 max-w-xl border border-indigo-200 dark:border-indigo-800">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Paperclip size={14} className="text-indigo-600 dark:text-indigo-400" />
+              <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                Files attached
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {fileList?.map((file, i) => (
+                <a
+                  key={i}
+                  href={`/${file.path}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  download={file.originalName}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-800/40 transition-colors group"
+                >
+                  <FileText size={14} className="text-indigo-500 flex-shrink-0" />
+                  <span className="text-sm text-indigo-700 dark:text-indigo-300 truncate max-w-[200px]">
+                    {file.originalName}
+                  </span>
+                  <span className="text-xs text-indigo-400 flex-shrink-0">
+                    {formatFileSize(file.size)}
+                  </span>
+                  <Download size={12} className="text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                </a>
+              ))}
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+            <User size={16} />
           </div>
         </div>
       );
@@ -594,4 +717,10 @@ function HITLRequestCard({
       </div>
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
