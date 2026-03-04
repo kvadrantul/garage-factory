@@ -140,7 +140,12 @@ For each scenario, generates SKILL.md files in `~/.openclaw/skills/{toolName}/`:
 - Agent message bubbles (left-aligned)
 - Tool call cards (blue) showing tool name and inputs
 - Tool result cards (green/red) showing execution status and JSON output
-- HITL request cards (yellow) for approval requests
+- HITL request cards (yellow) with interactive inline response:
+  - **Approval type:** Approve/Reject buttons with optional rejection reason
+  - **Input type:** Dynamic form fields (text, number, boolean, select, textarea)
+  - **Selection type:** Radio buttons with option descriptions
+  - Already-responded requests render as read-only status cards
+  - Backend creates `hitl_response` case step on submission
 - Error cards (red)
 - "Agent is thinking..." loading indicator
 - Auto-scroll to latest message
@@ -165,30 +170,45 @@ Session ID is:
 - Stored in case record (`openclawSessionId`)
 - Passed on subsequent messages for conversation continuity
 
+### 15. Cases Sidebar
+**File:** `packages/frontend/src/components/expert/CasesSidebar.tsx`
+
+- Left sidebar (w-64) in CaseChat page listing all cases for current domain
+- Status icons (Clock/CheckCircle/XCircle) with color coding
+- Active case highlighted with `bg-accent`
+- "New Case" button for creating cases in same domain
+- Click to switch between cases without leaving chat
+- Collapsible via toggle button to maximize chat area
+- Includes case count footer
+
+### 16. Case Progress Widget
+**File:** `packages/frontend/src/components/expert/CaseProgressWidget.tsx`
+
+- Compact vertical timeline of case steps with status dots/icons
+- Color-coded: blue (user), green (completed/agent), yellow (pending/HITL), red (error)
+- Short labels with content preview (truncated to 30 chars)
+- Integrated as collapsible "Progress" section at bottom of CasesSidebar
+- Dynamic overrides for tool_result (success/fail/waiting) and hitl_response (approved/rejected)
+
+### 17. Chat History HITL Enrichment
+**File:** `packages/backend/src/api/chat.ts`
+
+- GET /chat/history/:case_id enriches hitl_request steps with `hitl_details` from hitlRequests table
+- Includes: hitl_id, type, status, message, details, fields, options
+- Allows frontend to render interactive HITL forms without additional API calls
+
+### 18. HITL Response Step Creation
+**File:** `packages/backend/src/api/hitl.ts`
+
+- POST /hitl/:id/respond now creates a `hitl_response` case step after updating hitlRequests
+- Finds parent case via executionId -> caseSteps join
+- Step content includes: status, action, data, reason, hitlRequestId
+
 ---
 
 ## NOT YET IMPLEMENTED
 
-### 1. HITL Inline Response in Chat
-**Spec Phase 5**
-
-CaseChat renders HITL request cards, but users cannot respond to them inline.
-
-What's needed:
-- Render approval/input/selection form inside the HITL card
-- On submit -> POST /api/hitl/:id/respond
-- Resume workflow execution
-- Update chat with HITL response step
-
-### 2. Cases Sidebar
-**Spec Phase 5**
-
-Chat page currently navigates via back button to case list. Spec describes a sidebar listing cases within the current domain for quick switching.
-
-### 3. Case Progress Widget
-**Spec Phase 5**
-
-Separate component showing case steps as an ordered list with status icons (similar to pipeline widget). Currently steps are shown inline in the chat.
+All Phase 5 features are now implemented. The Expert Agent MVP is complete.
 
 ---
 
@@ -234,4 +254,6 @@ packages/frontend/src/pages/DomainList.tsx
 packages/frontend/src/pages/ScenarioList.tsx
 packages/frontend/src/pages/CaseList.tsx
 packages/frontend/src/pages/CaseChat.tsx
+packages/frontend/src/components/expert/CasesSidebar.tsx
+packages/frontend/src/components/expert/CaseProgressWidget.tsx
 ```

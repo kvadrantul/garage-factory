@@ -2,7 +2,8 @@
 
 import { Router, type Router as RouterType } from 'express';
 import { db, schema } from '../db/index.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
+import { nanoid } from 'nanoid';
 
 export const hitlRouter: RouterType = Router();
 
@@ -89,6 +90,43 @@ hitlRouter.post('/:id/respond', async (req, res) => {
       .where(eq(schema.hitlRequests.id, id))
       .returning()
       .get();
+
+    // Create hitl_response case step so it appears in chat history
+    const parentStep = await db
+      .select()
+      .from(schema.caseSteps)
+      .where(
+        and(
+          eq(schema.caseSteps.executionId, hitl.executionId),
+          eq(schema.caseSteps.type, 'hitl_request'),
+        ),
+      )
+      .get();
+
+    if (parentStep) {
+      const stepCountResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.caseSteps)
+        .where(eq(schema.caseSteps.caseId, parentStep.caseId))
+        .get();
+
+      await db.insert(schema.caseSteps).values({
+        id: nanoid(16),
+        caseId: parentStep.caseId,
+        stepIndex: stepCountResult?.count || 0,
+        type: 'hitl_response',
+        content: JSON.stringify({
+          status: newStatus,
+          action,
+          data: responseData,
+          reason,
+          hitlRequestId: id,
+        }),
+        executionId: hitl.executionId,
+        scenarioId: parentStep.scenarioId,
+        createdAt: new Date(),
+      });
+    }
 
     res.json({
       id: result?.id,

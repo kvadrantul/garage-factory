@@ -394,15 +394,58 @@ chatRouter.get('/history/:case_id', async (req, res) => {
 
     steps.sort((a, b) => a.stepIndex - b.stepIndex);
 
+    // Enrich hitl_request steps with HITL details from hitlRequests table
+    const enrichedSteps = await Promise.all(
+      steps.map(async (s) => {
+        const base = {
+          id: s.id,
+          step_index: s.stepIndex,
+          type: s.type,
+          content: s.content,
+          created_at: s.createdAt,
+        };
+
+        if (s.type === 'hitl_request') {
+          try {
+            const content = typeof s.content === 'string' ? JSON.parse(s.content) : s.content;
+            if (content.hitlRequestId) {
+              const hitlRequest = await db
+                .select()
+                .from(schema.hitlRequests)
+                .where(eq(schema.hitlRequests.id, content.hitlRequestId))
+                .get();
+
+              if (hitlRequest) {
+                const requestData = typeof hitlRequest.requestData === 'string'
+                  ? JSON.parse(hitlRequest.requestData)
+                  : hitlRequest.requestData;
+
+                return {
+                  ...base,
+                  hitl_details: {
+                    hitl_id: hitlRequest.id,
+                    type: hitlRequest.type,
+                    status: hitlRequest.status,
+                    message: requestData?.message,
+                    details: requestData?.details,
+                    fields: requestData?.fields,
+                    options: requestData?.options,
+                  },
+                };
+              }
+            }
+          } catch {
+            // If parsing fails, return base step
+          }
+        }
+
+        return base;
+      }),
+    );
+
     res.json({
       case_id,
-      steps: steps.map((s) => ({
-        id: s.id,
-        step_index: s.stepIndex,
-        type: s.type,
-        content: s.content,
-        created_at: s.createdAt,
-      })),
+      steps: enrichedSteps,
     });
   } catch (error) {
     console.error('Error fetching chat history:', error);
