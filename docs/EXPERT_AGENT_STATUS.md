@@ -208,7 +208,128 @@ Session ID is:
 
 ## NOT YET IMPLEMENTED
 
-All Phase 5 features are now implemented. The Expert Agent MVP is complete.
+All Phase 5 (MVP) features are now implemented.
+
+### Architecture TODO - Post-MVP Roadmap
+
+Below are the architectural gaps identified after MVP completion. Ordered by impact.
+
+#### 1. Async Execution Queue + Polling
+**Problem:** Entire chat/send request blocks synchronously (agent call + workflow execution). Timeout 120s for agent, 5 min for workflow. Server can't handle concurrent users.
+**Solution:**
+- Introduce BullMQ (or similar) job queue for agent interactions
+- POST /api/chat/send returns immediately with `{job_id, status: "processing"}`
+- Frontend polls GET /api/chat/status/:job_id or uses SSE for updates
+- Sync-executor moves from blocking Promise to queue-based job
+- caseSteps get written incrementally as job progresses
+**Files to create/modify:** New `packages/backend/src/services/job-queue.ts`, modify `chat.ts`, add SSE endpoint or WebSocket channel
+**Impact:** Enables concurrent users, removes timeouts, enables long-running workflows
+
+#### 2. Streaming Agent Responses (SSE)
+**Problem:** User stares at spinner for 10-60 seconds. No feedback until agent fully finishes.
+**Solution:**
+- Replace CLI spawn with OpenClaw streaming API (if available) or implement Server-Sent Events
+- Backend pushes partial tokens to frontend as agent generates
+- Frontend renders tokens incrementally in assistant_message bubble
+- Tool call detection happens on completed chunks
+**Files to create/modify:** New SSE endpoint in `chat.ts`, frontend EventSource client in `CaseChat.tsx`
+**Depends on:** Async execution queue (item 1) or can be done standalone with SSE from sync endpoint
+
+#### 3. Replace CLI Spawn with API Client
+**Problem:** Each message spawns `openclaw agent` as new OS process (~100-200ms overhead). No connection reuse, no streaming, no parallel calls. Doesn't scale.
+**Solution:**
+- Use OpenClaw HTTP/gRPC API client instead of CLI spawn
+- Maintain persistent connection per agent session
+- Enable streaming token delivery
+- Reduce latency from ~200ms to ~10ms per call
+**Files to modify:** `chat.ts` (callOpenClawAgent function), potentially `agent-provisioner.ts`
+**Impact:** 10-20x latency improvement, enables streaming, reduces server load
+
+#### 4. File Upload & Dynamic File Context
+**Problem:** Files (e.g., Excel bank statements) are referenced by hardcoded absolute paths in workflow node configs. Users can't upload files through chat or attach them to a case. Agent has no way to pass a user-provided file to a tool.
+**Solution:**
+- **File upload endpoint:** POST /api/cases/:id/upload -> saves to `uploads/{caseId}/{filename}`, returns path
+- **Chat attachment UI:** Drag-drop or paperclip button in CaseChat input area. File appears as `file_upload` case step
+- **File context in case:** Case record gets `files[]` array (or separate `caseFiles` table) tracking uploaded files
+- **Agent sees files:** When building tool context, include list of uploaded files with paths. Agent can reference them in tool_call inputs
+- **Dynamic bridgeInputs:** Workflow nodes read filePath from `$input.bridgeInputs.filePath` instead of static config
+- **New case step type:** `file_upload` with content `{ fileName, filePath, mimeType, size }`
+**Files to create/modify:** New upload endpoint in `expert.ts`, new `uploads/` storage dir, modify `chat.ts` (inject file context), modify `CaseChat.tsx` (file attachment UI), schema migration (caseFiles table or extend caseSteps)
+**Impact:** Users can work with their own files. Enables real-world usage beyond demo data
+
+#### 5. Composable Atomic Nodes for Data Operations
+**Problem:** Current custom nodes are monolithic (e.g., `excel-bik-sum` does read + filter + aggregate in one blob of code). Can't reuse parts. Adding a new operation means writing a new custom node from scratch.
+**Solution:**
+- Build reusable atomic nodes following n8n pattern:
+  - `read-excel` (already exists) -- reads any Excel file, returns rows
+  - `filter-rows` -- filter by column condition (equals, contains, greater than, etc.)
+  - `aggregate` -- sum/count/avg/min/max by specified columns, optional group-by
+  - `sort-rows` -- sort by column(s)
+  - `select-columns` -- pick/rename columns
+  - `format-output` -- format results as table/summary/markdown
+- Each node accepts dynamic config via expressions (`{{$input.bridgeInputs.column}}`)
+- Workflows compose these nodes into domain-specific pipelines
+**Files to create:** New node manifests in `packages/backend/src/nodes/manifests/`, or custom_nodes in DB
+**Impact:** New data operations assembled from existing blocks instead of writing code. Admin builds workflows visually in editor
+
+#### 6. Input Validation & Output Schema Enforcement
+**Problem:** No validation on tool inputs before workflow execution. Output schemas defined in scenarios but never enforced. Garbage in = cryptic workflow errors.
+**Solution:**
+- Validate inputs against scenario's `inputsSchema` in bridge.ts before execution
+- Validate/transform outputs against `outputsSchema` after execution
+- Return structured validation errors to agent so it can retry with correct inputs
+**Files to modify:** `bridge.ts`, `sync-executor.ts`
+**Impact:** Better error messages, fewer wasted executions, agent can self-correct
+
+#### 7. Authentication & Authorization
+**Problem:** Expert API endpoints have no auth. Anyone can call POST /api/chat/send, create domains, delete cases.
+**Solution:**
+- Auth middleware for expert API routes (JWT or session-based)
+- User ownership of cases (userId field in cases table)
+- Domain-level access control (who can chat with which domain)
+- Rate limiting per user
+**Files to modify:** New auth middleware, schema migration (add userId), all expert API routes
+**Impact:** Required for any multi-user deployment
+
+#### 8. Agent Memory & Cross-Case Learning
+**Problem:** Each case is isolated. Agent has session memory within a case but no knowledge of past cases, patterns, or domain-specific learnings.
+**Solution:**
+- Case summarization on close (agent generates summary, stored in cases.summary)
+- Vector DB (Pinecone/ChromaDB) for semantic search across case history
+- RAG: inject relevant past case summaries into agent context
+- Domain knowledge base: upload docs/PDFs that get embedded and searchable
+**Files to create:** New `packages/backend/src/services/memory-service.ts`, vector DB integration, embedding pipeline
+**Impact:** Agent gets smarter over time, handles similar cases better
+
+#### 9. Multi-Agent Orchestration
+**Problem:** One domain = one agent. Complex tasks requiring multiple specializations (e.g., "review contract" needs legal + financial + compliance agents) can't be delegated.
+**Solution:**
+- Agent router: meta-agent that delegates to specialist domain agents
+- Inter-agent protocol: agent A can invoke agent B as a tool
+- Shared context/blackboard for multi-agent collaboration
+- Orchestration patterns: sequential, parallel, hierarchical
+**Files to create:** New `packages/backend/src/services/agent-router.ts`, new node type "agent-call"
+**Impact:** Enables complex multi-domain workflows
+
+#### 10. Observability & Monitoring
+**Problem:** Console logs only. No way to diagnose slow responses, track tool success rates, or detect failures in production.
+**Solution:**
+- Structured logging (pino/winston) with correlation IDs
+- OpenTelemetry tracing: trace from HTTP request → agent call → workflow execution → response
+- Metrics: response time P50/P95, tool call success rate, agent error rate
+- Dashboard (Grafana) for monitoring
+**Files to create:** New `packages/backend/src/services/telemetry.ts`, instrument all API routes
+**Impact:** Required for production operations
+
+#### 11. Error Recovery & Resilience
+**Problem:** If tool fails, agent gets error message but there's no retry logic, no circuit breaker, no fallback. Failed executions don't get replayed.
+**Solution:**
+- Configurable retry policy per scenario (max retries, backoff)
+- Circuit breaker: if tool fails N times, mark as degraded
+- Dead letter queue for failed executions
+- Graceful degradation: agent knows tool is unavailable and adjusts
+**Files to modify:** `sync-executor.ts`, `chat.ts` tool-calling loop, new `packages/backend/src/services/circuit-breaker.ts`
+**Impact:** System stays functional when individual tools break
 
 ---
 

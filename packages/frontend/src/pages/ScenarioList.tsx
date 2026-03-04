@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Trash2, Edit2, Workflow, ToggleLeft, ToggleRight } from 'lucide-react';
 import { scenariosApi, domainsApi, workflowsApi } from '@/api/client';
-import { AppHeader } from '@/components/AppHeader';
 
 const RISK_CLASSES = [
   { value: 'read_only', label: 'Read Only', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
@@ -72,19 +71,9 @@ export function ScenarioList() {
   const currentDomain = domainsData?.data.find((d: any) => d.id === domainId);
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-        >
-          <Plus size={20} />
-          New Scenario
-        </button>
-      </AppHeader>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-6">
+    <main className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
           <h1 className="text-2xl font-bold text-foreground">
             Scenarios {currentDomain && `- ${currentDomain.name}`}
           </h1>
@@ -92,6 +81,14 @@ export function ScenarioList() {
             Workflow-backed tools available to expert agents
           </p>
         </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+        >
+          <Plus size={20} />
+          New Scenario
+        </button>
+      </div>
 
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Loading...</div>
@@ -177,7 +174,6 @@ export function ScenarioList() {
             })}
           </div>
         )}
-      </main>
 
       {/* Create/Edit Modal */}
       {(showCreateModal || editingScenario) && (
@@ -200,7 +196,7 @@ export function ScenarioList() {
           isLoading={createMutation.isPending || updateMutation.isPending}
         />
       )}
-    </div>
+    </main>
   );
 }
 

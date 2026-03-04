@@ -13,7 +13,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { hitlApi } from '@/api/client';
-import { AppHeader } from '@/components/AppHeader';
 
 interface HITLRequest {
   id: string;
@@ -223,13 +222,9 @@ export function HITLList() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader />
-
-      {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-foreground">Human-in-the-Loop Requests</h2>
+    <main className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold text-foreground">Human-in-the-Loop Requests</h2>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -260,6 +255,5 @@ export function HITLList() {
           </div>
         )}
       </main>
-    </div>
   );
 }

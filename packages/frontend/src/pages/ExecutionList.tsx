@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Trash2, StopCircle, Clock, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { executionsApi } from '@/api/client';
-import { AppHeader } from '@/components/AppHeader';
 
 const statusConfig: Record<string, { icon: typeof Clock; color: string; bg: string }> = {
   pending: { icon: Clock, color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-800' },
@@ -46,12 +45,8 @@ export function ExecutionList() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader />
-
-      {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <h2 className="text-xl font-semibold text-foreground mb-6">Executions</h2>
+    <main className="p-6">
+      <h2 className="text-xl font-semibold text-foreground mb-6">Executions</h2>
 
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Loading...</div>
@@ -168,6 +163,5 @@ export function ExecutionList() {
           </div>
         )}
       </main>
-    </div>
   );
 }

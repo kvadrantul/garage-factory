@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Play, Trash2 } from 'lucide-react';
 import { workflowsApi } from '@/api/client';
-import { AppHeader } from '@/components/AppHeader';
 
 export function WorkflowList() {
   const navigate = useNavigate();
@@ -29,8 +28,9 @@ export function WorkflowList() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader>
+    <main className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-foreground">Workflows</h1>
         <button
           onClick={handleCreate}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
@@ -38,11 +38,9 @@ export function WorkflowList() {
           <Plus size={20} />
           New Workflow
         </button>
-      </AppHeader>
+      </div>
 
-      {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {isLoading ? (
+      {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Loading...</div>
         ) : data?.data.length === 0 ? (
           <div className="text-center py-12">
@@ -109,6 +107,5 @@ export function WorkflowList() {
           </div>
         )}
       </main>
-    </div>
   );
 }

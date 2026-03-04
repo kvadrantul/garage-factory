@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { AppLayout } from './components/AppLayout';
 import { WorkflowList } from './pages/WorkflowList';
 import { WorkflowEditor } from './pages/WorkflowEditor';
 import { ExecutionList } from './pages/ExecutionList';
@@ -17,20 +18,23 @@ function App() {
     <div className="h-screen bg-background text-foreground">
       <Routes>
         <Route path="/" element={<Navigate to="/workflows" replace />} />
-        <Route path="/workflows" element={<WorkflowList />} />
+        {/* Sidebar layout */}
+        <Route element={<AppLayout />}>
+          <Route path="/workflows" element={<WorkflowList />} />
+          <Route path="/executions" element={<ExecutionList />} />
+          <Route path="/executions/:id" element={<ExecutionDetail />} />
+          <Route path="/hitl" element={<HITLList />} />
+          <Route path="/credentials" element={<CredentialsList />} />
+          <Route path="/custom-nodes" element={<CustomNodeList />} />
+          <Route path="/domains" element={<DomainList />} />
+          <Route path="/scenarios" element={<ScenarioList />} />
+          <Route path="/cases" element={<CaseList />} />
+        </Route>
+        {/* Full-screen pages (no sidebar) */}
         <Route path="/workflows/new" element={<WorkflowEditor />} />
         <Route path="/workflows/:id" element={<WorkflowEditor />} />
-        <Route path="/executions" element={<ExecutionList />} />
-        <Route path="/executions/:id" element={<ExecutionDetail />} />
-        <Route path="/hitl" element={<HITLList />} />
-        <Route path="/credentials" element={<CredentialsList />} />
-        <Route path="/custom-nodes" element={<CustomNodeList />} />
         <Route path="/custom-nodes/new" element={<CustomNodeEditor />} />
         <Route path="/custom-nodes/:id/edit" element={<CustomNodeEditor />} />
-        {/* Expert Agent Routes */}
-        <Route path="/domains" element={<DomainList />} />
-        <Route path="/scenarios" element={<ScenarioList />} />
-        <Route path="/cases" element={<CaseList />} />
         <Route path="/cases/:id/chat" element={<CaseChat />} />
       </Routes>
     </div>

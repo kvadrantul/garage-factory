@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Plus, Trash2, Edit2, Building2 } from 'lucide-react';
 import { domainsApi } from '@/api/client';
-import { AppHeader } from '@/components/AppHeader';
 
 export function DomainList() {
   const queryClient = useQueryClient();
@@ -39,8 +38,14 @@ export function DomainList() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader>
+    <main className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Offices</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage domain offices where expert agents operate
+          </p>
+        </div>
         <button
           onClick={() => setShowCreateModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
@@ -48,15 +53,7 @@ export function DomainList() {
           <Plus size={20} />
           New Domain
         </button>
-      </AppHeader>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Expert Domains</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage domain offices where expert agents operate
-          </p>
-        </div>
+      </div>
 
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Loading...</div>
@@ -135,7 +132,6 @@ export function DomainList() {
             ))}
           </div>
         )}
-      </main>
 
       {/* Create/Edit Modal */}
       {(showCreateModal || editingDomain) && (
@@ -155,7 +151,7 @@ export function DomainList() {
           isLoading={createMutation.isPending || updateMutation.isPending}
         />
       )}
-    </div>
+    </main>
   );
 }
 

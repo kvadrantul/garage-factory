@@ -2,10 +2,9 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit, Trash2, ToggleLeft, ToggleRight, ArrowLeft } from 'lucide-react';
+import { Plus, Edit, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import { customNodesApi } from '@/api/client';
 import { resolveIcon } from '@/components/nodes/icon-resolver';
-import { AppHeader } from '@/components/AppHeader';
 
 export function CustomNodeList() {
   const navigate = useNavigate();
@@ -37,33 +36,22 @@ export function CustomNodeList() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <AppHeader />
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate('/workflows')}
-                className="p-2 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft size={20} />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Custom Nodes</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Manage custom workflow nodes built on top of the Code engine
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => navigate('/custom-nodes/new')}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded hover:opacity-90 transition-opacity"
-            >
-              <Plus size={16} />
-              Create Node
-            </button>
-          </div>
+    <main className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Custom Nodes</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage custom workflow nodes built on top of the Code engine
+          </p>
+        </div>
+        <button
+          onClick={() => navigate('/custom-nodes/new')}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded hover:opacity-90 transition-opacity"
+        >
+          <Plus size={16} />
+          Create Node
+        </button>
+      </div>
 
           {isLoading ? (
             <div className="text-center text-muted-foreground py-12">Loading...</div>
@@ -148,8 +136,6 @@ export function CustomNodeList() {
               })}
             </div>
           )}
-        </div>
-      </div>
-    </div>
+    </main>
   );
 }

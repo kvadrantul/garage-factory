@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Plus, Trash2, MessageSquare, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { casesApi, domainsApi } from '@/api/client';
-import { AppHeader } from '@/components/AppHeader';
 
 const STATUS_CONFIG = {
   open: { label: 'Open', icon: Clock, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
@@ -46,19 +45,9 @@ export function CaseList() {
   const currentDomain = domainsData?.data.find((d: any) => d.id === domainId);
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-        >
-          <Plus size={20} />
-          New Case
-        </button>
-      </AppHeader>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-6">
+    <main className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
           <h1 className="text-2xl font-bold text-foreground">
             Cases {currentDomain && `- ${currentDomain.name}`}
           </h1>
@@ -66,6 +55,14 @@ export function CaseList() {
             Expert consultation sessions
           </p>
         </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+        >
+          <Plus size={20} />
+          New Case
+        </button>
+      </div>
 
         {/* Filters */}
         <div className="flex gap-2 mb-6">
@@ -163,7 +160,6 @@ export function CaseList() {
             })}
           </div>
         )}
-      </main>
 
       {/* Create Modal */}
       {showCreateModal && (
@@ -175,7 +171,7 @@ export function CaseList() {
           isLoading={createMutation.isPending}
         />
       )}
-    </div>
+    </main>
   );
 }
 

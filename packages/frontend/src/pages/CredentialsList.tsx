@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Key, Edit2, X } from 'lucide-react';
 import { credentialsApi } from '@/api/client';
-import { AppHeader } from '@/components/AppHeader';
 
 interface Credential {
   id: string;
@@ -57,8 +56,9 @@ export function CredentialsList() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader>
+    <main className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-foreground">Credentials</h1>
         <button
           onClick={handleCreate}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
@@ -66,10 +66,9 @@ export function CredentialsList() {
           <Plus size={20} />
           New Credential
         </button>
-      </AppHeader>
+      </div>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {isLoading ? (
+      {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Loading...</div>
         ) : data?.data.length === 0 ? (
           <div className="text-center py-12">
@@ -132,7 +131,6 @@ export function CredentialsList() {
             ))}
           </div>
         )}
-      </main>
 
       {/* Create/Edit Modal */}
       {isModalOpen && (
@@ -145,7 +143,7 @@ export function CredentialsList() {
           }}
         />
       )}
-    </div>
+    </main>
   );
 }
 
