@@ -208,7 +208,7 @@ export const caseSteps = sqliteTable('case_steps', {
   id: text('id').primaryKey().$defaultFn(generateId),
   caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
   stepIndex: integer('step_index').notNull(),
-  type: text('type', { enum: ['tool_call', 'tool_result', 'hitl_request', 'hitl_response'] }).notNull(),
+  type: text('type', { enum: ['user_message', 'assistant_message', 'tool_call', 'tool_result', 'hitl_request', 'hitl_response', 'error'] }).notNull(),
   content: text('content', { mode: 'json' }),
   executionId: text('execution_id').references(() => executions.id),
   scenarioId: text('scenario_id').references(() => scenarios.id),

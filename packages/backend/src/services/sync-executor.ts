@@ -13,21 +13,33 @@ const SYNC_TIMEOUT_MS = 300_000; // 5 minutes max for sync execution
 export const executionEventBus = new EventEmitter();
 executionEventBus.setMaxListeners(100);
 
-interface ExecutionCompletedEvent {
-  executionId: string;
-  status: ExecutionStatus;
-  outputs?: Record<string, unknown>;
-  error?: string;
-}
-
-interface HITLRequiredEvent {
-  executionId: string;
-  requestId: string;
+/**
+ * Fetch outputs from the last completed node of an execution
+ */
+async function fetchExecutionOutputs(executionId: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    const nodes = await db
+      .select()
+      .from(schema.executionNodes)
+      .where(eq(schema.executionNodes.executionId, executionId));
+    const outputNode = nodes
+      .filter((n) => n.status === 'completed' && n.outputData)
+      .pop();
+    if (outputNode?.outputData) {
+      return outputNode.outputData as Record<string, unknown>;
+    }
+  } catch (err) {
+    console.error(`[sync-executor] Error fetching execution nodes:`, err);
+  }
+  return undefined;
 }
 
 /**
  * Execute a workflow synchronously (blocking until completion or HITL)
- * Returns when execution completes, fails, or requires HITL intervention
+ * Returns when execution completes, fails, or requires HITL intervention.
+ *
+ * Uses the completionPromise from ExecutionService directly to avoid
+ * race conditions with event-based notification.
  */
 export async function executeWorkflowSync(
   workflowId: string,
@@ -38,94 +50,72 @@ export async function executeWorkflowSync(
   const startTime = Date.now();
   const executionService = getExecutionService();
 
-  // Start execution (fire-and-forget internally)
-  const { executionId } = await executionService.executeWorkflow(
+  // Start execution - completionPromise resolves when runner.execute() finishes
+  const { executionId, completionPromise } = await executionService.executeWorkflow(
     workflowId,
     triggerType,
     triggerData,
   );
 
-  // Wait for completion, failure, or HITL
-  return new Promise<SyncExecuteResult>((resolve) => {
-    let resolved = false;
-
-    const cleanup = () => {
-      if (resolved) return;
-      resolved = true;
-      executionEventBus.off('execution:completed', onCompleted);
-      executionEventBus.off('execution:failed', onFailed);
-      executionEventBus.off('hitl:required', onHitlRequired);
-      clearTimeout(timeoutHandle);
-    };
-
-    const onCompleted = (event: ExecutionCompletedEvent) => {
-      if (event.executionId !== executionId) return;
-      cleanup();
-      resolve({
-        executionId,
-        status: 'completed',
-        outputs: event.outputs,
-        durationMs: Date.now() - startTime,
-      });
-    };
-
-    const onFailed = (event: ExecutionCompletedEvent) => {
-      if (event.executionId !== executionId) return;
-      cleanup();
-      resolve({
-        executionId,
-        status: 'failed',
-        error: event.error,
-        durationMs: Date.now() - startTime,
-      });
-    };
-
-    const onHitlRequired = (event: HITLRequiredEvent) => {
-      if (event.executionId !== executionId) return;
-      cleanup();
-      resolve({
-        executionId,
-        status: 'waiting_hitl',
-        hitlRequestId: event.requestId,
-        durationMs: Date.now() - startTime,
-      });
-    };
-
-    executionEventBus.on('execution:completed', onCompleted);
-    executionEventBus.on('execution:failed', onFailed);
-    executionEventBus.on('hitl:required', onHitlRequired);
-
-    // Timeout fallback - check DB for status
-    const timeoutHandle = setTimeout(async () => {
-      if (resolved) return;
-
-      // Check current status from DB
-      const execution = await db
-        .select()
-        .from(schema.executions)
-        .where(eq(schema.executions.id, executionId))
-        .get();
-
-      cleanup();
-
-      if (!execution) {
-        resolve({
-          executionId,
-          status: 'failed',
-          error: 'Execution not found',
-          durationMs: Date.now() - startTime,
-        });
-        return;
-      }
-
-      resolve({
-        executionId,
-        status: execution.status as ExecutionStatus,
-        error: execution.error ?? undefined,
-        durationMs: Date.now() - startTime,
-      });
-    }, timeoutMs);
+  // Race: completion vs timeout
+  const timeoutPromise = new Promise<{ status: 'timeout' }>((resolve) => {
+    setTimeout(() => resolve({ status: 'timeout' }), timeoutMs);
   });
+
+  const result = await Promise.race([
+    completionPromise.then((r) => ({ ...r, status: r.status as string })),
+    timeoutPromise,
+  ]);
+
+  if (result.status === 'timeout') {
+    // Check DB for actual status
+    const execution = await db
+      .select()
+      .from(schema.executions)
+      .where(eq(schema.executions.id, executionId))
+      .get();
+
+    return {
+      executionId,
+      status: (execution?.status ?? 'failed') as ExecutionStatus,
+      error: execution?.error ?? 'Execution timed out',
+      durationMs: Date.now() - startTime,
+    };
+  }
+
+  const durationMs = Date.now() - startTime;
+
+  if (result.status === 'completed') {
+    const outputs = await fetchExecutionOutputs(executionId);
+    return { executionId, status: 'completed', outputs, durationMs };
+  }
+
+  if (result.status === 'failed') {
+    return {
+      executionId,
+      status: 'failed',
+      error: (result as { error?: string }).error,
+      durationMs,
+    };
+  }
+
+  // For waiting_hitl or other statuses, check for HITL request
+  if (result.status === 'waiting_hitl') {
+    const hitlRequest = await db
+      .select()
+      .from(schema.hitlRequests)
+      .where(eq(schema.hitlRequests.executionId, executionId))
+      .get();
+
+    return {
+      executionId,
+      status: 'waiting_hitl',
+      hitlRequestId: hitlRequest?.id,
+      durationMs,
+    };
+  }
+
+  return { executionId, status: result.status as ExecutionStatus, durationMs };
 }
 
 /**

@@ -5,6 +5,8 @@ import { Router, type Router as RouterType } from 'express';
 import { db, schema } from '../db/index.js';
 import { eq, desc, and } from 'drizzle-orm';
 import type { Domain, Scenario, Case } from '@garage-engine/shared';
+import { provisionAgent, updateAgentIdentity, deleteAgent } from '../services/agent-provisioner.js';
+import { generateSkill, removeSkill } from '../services/skill-generator.js';
 
 export const expertRouter: RouterType = Router();
 
@@ -110,7 +112,23 @@ expertRouter.post('/domains', async (req, res) => {
       })
       .returning();
 
-    res.status(201).json(result[0]);
+    const domain = result[0];
+
+    // Provision OpenClaw agent if no agentId was provided
+    if (!agentId) {
+      try {
+        const provision = await provisionAgent({ name, slug, description, icon, systemPrompt });
+        await db
+          .update(schema.domains)
+          .set({ agentId: provision.agentId, updatedAt: new Date() })
+          .where(eq(schema.domains.id, domain.id));
+        domain.agentId = provision.agentId;
+      } catch (err) {
+        console.warn('[expert] Agent provisioning failed (domain created without agent):', err);
+      }
+    }
+
+    res.status(201).json(domain);
   } catch (error) {
     console.error('Error creating domain:', error);
     res.status(500).json({
@@ -169,7 +187,24 @@ expertRouter.put('/domains/:id', async (req, res) => {
       .where(eq(schema.domains.id, id))
       .returning();
 
-    res.json(result[0]);
+    const updated = result[0];
+
+    // Update OpenClaw agent identity if agent exists
+    if (updated.agentId) {
+      try {
+        await updateAgentIdentity(updated.agentId, {
+          name: updated.name,
+          slug: updated.slug,
+          description: updated.description,
+          icon: updated.icon,
+          systemPrompt: updated.systemPrompt,
+        });
+      } catch (err) {
+        console.warn('[expert] Agent identity update failed:', err);
+      }
+    }
+
+    res.json(updated);
   } catch (error) {
     console.error('Error updating domain:', error);
     res.status(500).json({
@@ -186,7 +221,23 @@ expertRouter.delete('/domains/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Get domain to find agentId before deleting
+    const domain = await db
+      .select()
+      .from(schema.domains)
+      .where(eq(schema.domains.id, id))
+      .get();
+
     await db.delete(schema.domains).where(eq(schema.domains.id, id));
+
+    // Delete OpenClaw agent if it was provisioned
+    if (domain?.agentId) {
+      try {
+        await deleteAgent(domain.agentId);
+      } catch (err) {
+        console.warn('[expert] Agent deletion failed:', err);
+      }
+    }
 
     res.status(204).send();
   } catch (error) {
@@ -374,6 +425,21 @@ expertRouter.post('/scenarios', async (req, res) => {
       })
       .returning();
 
+    // Generate OpenClaw skill file if domain has an agent
+    if (domain.agentId && (enabled ?? true)) {
+      try {
+        await generateSkill(domain.agentId, {
+          toolName,
+          name,
+          shortDescription,
+          whenToApply,
+          inputsSchema: inputsSchema as Record<string, unknown> | undefined,
+        });
+      } catch (err) {
+        console.warn('[expert] Skill generation failed:', err);
+      }
+    }
+
     res.status(201).json(result[0]);
   } catch (error) {
     console.error('Error creating scenario:', error);
@@ -449,7 +515,40 @@ expertRouter.put('/scenarios/:id', async (req, res) => {
       .where(eq(schema.scenarios.id, id))
       .returning();
 
-    res.json(result[0]);
+    const updated = result[0];
+
+    // Regenerate skill if domain has an agent
+    const domain = await db
+      .select()
+      .from(schema.domains)
+      .where(eq(schema.domains.id, newDomainId))
+      .get();
+
+    if (domain?.agentId) {
+      try {
+        // Remove old skill if toolName changed
+        if (existing.toolName !== newToolName) {
+          await removeSkill(domain.agentId, existing.toolName);
+        }
+        // Generate/update skill if enabled
+        if (updated.enabled) {
+          await generateSkill(domain.agentId, {
+            toolName: newToolName,
+            name: updated.name,
+            shortDescription: updated.shortDescription,
+            whenToApply: updated.whenToApply,
+            inputsSchema: updated.inputsSchema as Record<string, unknown> | undefined,
+          });
+        } else {
+          // Remove skill if disabled
+          await removeSkill(domain.agentId, newToolName);
+        }
+      } catch (err) {
+        console.warn('[expert] Skill update failed:', err);
+      }
+    }
+
+    res.json(updated);
   } catch (error) {
     console.error('Error updating scenario:', error);
     res.status(500).json({
@@ -466,7 +565,33 @@ expertRouter.delete('/scenarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    await db.delete(schema.scenarios).where(eq(schema.scenarios.id, id));
+    // Get scenario + domain info before deleting
+    const scenario = await db
+      .select()
+      .from(schema.scenarios)
+      .where(eq(schema.scenarios.id, id))
+      .get();
+
+    if (scenario) {
+      const domain = await db
+        .select()
+        .from(schema.domains)
+        .where(eq(schema.domains.id, scenario.domainId))
+        .get();
+
+      await db.delete(schema.scenarios).where(eq(schema.scenarios.id, id));
+
+      // Remove skill from agent workspace
+      if (domain?.agentId) {
+        try {
+          await removeSkill(domain.agentId, scenario.toolName);
+        } catch (err) {
+          console.warn('[expert] Skill removal failed:', err);
+        }
+      }
+    } else {
+      await db.delete(schema.scenarios).where(eq(schema.scenarios.id, id));
+    }
 
     res.status(204).send();
   } catch (error) {

@@ -19,7 +19,7 @@ export class ExecutionService {
     workflowId: string,
     triggerType: TriggerType,
     triggerData: unknown,
-  ): Promise<{ executionId: string }> {
+  ): Promise<{ executionId: string; completionPromise: Promise<{ status: string; error?: string }> }> {
     const workflow = await db
       .select()
       .from(schema.workflows)
@@ -66,7 +66,7 @@ export class ExecutionService {
       this.activeExecutions.delete(executionId);
     });
 
-    return { executionId };
+    return { executionId, completionPromise: resultPromise };
   }
 
   async stopExecution(executionId: string): Promise<void> {
