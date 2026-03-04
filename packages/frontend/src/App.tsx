@@ -7,6 +7,10 @@ import { HITLList } from './pages/HITLList';
 import { CredentialsList } from './pages/CredentialsList';
 import { CustomNodeList } from './pages/CustomNodeList';
 import { CustomNodeEditor } from './pages/CustomNodeEditor';
+import { DomainList } from './pages/DomainList';
+import { ScenarioList } from './pages/ScenarioList';
+import { CaseList } from './pages/CaseList';
+import { CaseChat } from './pages/CaseChat';
 
 function App() {
   return (
@@ -23,6 +27,11 @@ function App() {
         <Route path="/custom-nodes" element={<CustomNodeList />} />
         <Route path="/custom-nodes/new" element={<CustomNodeEditor />} />
         <Route path="/custom-nodes/:id/edit" element={<CustomNodeEditor />} />
+        {/* Expert Agent Routes */}
+        <Route path="/domains" element={<DomainList />} />
+        <Route path="/scenarios" element={<ScenarioList />} />
+        <Route path="/cases" element={<CaseList />} />
+        <Route path="/cases/:id/chat" element={<CaseChat />} />
       </Routes>
     </div>
   );

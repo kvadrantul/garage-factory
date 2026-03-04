@@ -145,3 +145,118 @@ export const customNodesApi = {
       body: JSON.stringify(data),
     }),
 };
+
+// Expert API - Domains
+export const domainsApi = {
+  list: () =>
+    request<{ data: any[] }>('/expert/domains'),
+
+  get: (id: string) =>
+    request<any>(`/expert/domains/${id}`),
+
+  create: (data: { name: string; slug: string; description?: string; icon?: string; agentId?: string; systemPrompt?: string }) =>
+    request<any>('/expert/domains', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<{ name: string; slug: string; description: string; icon: string; agentId: string; systemPrompt: string }>) =>
+    request<any>(`/expert/domains/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    request<void>(`/expert/domains/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// Helper to filter undefined params
+function cleanParams(params?: Record<string, string | undefined>): Record<string, string> {
+  if (!params) return {};
+  return Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== undefined && v !== null)
+  ) as Record<string, string>;
+}
+
+// Expert API - Scenarios
+export const scenariosApi = {
+  list: (params?: { domain_id?: string }) =>
+    request<{ data: any[] }>(`/expert/scenarios?${new URLSearchParams(cleanParams(params))}`),
+
+  get: (id: string) =>
+    request<any>(`/expert/scenarios/${id}`),
+
+  create: (data: {
+    workflowId: string;
+    domainId: string;
+    toolName: string;
+    name: string;
+    shortDescription: string;
+    whenToApply: string;
+    inputsSchema?: Record<string, unknown>;
+    outputsSchema?: Record<string, unknown>;
+    riskClass?: string;
+    estimatedDuration?: string;
+    enabled?: boolean;
+  }) =>
+    request<any>('/expert/scenarios', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<any>) =>
+    request<any>(`/expert/scenarios/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    request<void>(`/expert/scenarios/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// Expert API - Cases
+export const casesApi = {
+  list: (params?: { domain_id?: string; status?: string }) =>
+    request<{ data: any[] }>(`/expert/cases?${new URLSearchParams(cleanParams(params))}`),
+
+  get: (id: string) =>
+    request<any>(`/expert/cases/${id}`),
+
+  create: (data: { domainId: string; title?: string }) =>
+    request<any>('/expert/cases', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<{ title: string; status: string; summary: string }>) =>
+    request<any>(`/expert/cases/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    request<void>(`/expert/cases/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// Chat API
+export const chatApi = {
+  send: (caseId: string, message: string) =>
+    request<{
+      session_id: string;
+      message: { role: string; content: string; tool_calls?: any[] };
+      finish_reason: string;
+      has_tool_calls: boolean;
+    }>('/chat/send', {
+      method: 'POST',
+      body: JSON.stringify({ case_id: caseId, message }),
+    }),
+
+  history: (caseId: string) =>
+    request<{ case_id: string; steps: any[] }>(`/chat/history/${caseId}`),
+};

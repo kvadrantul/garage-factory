@@ -105,6 +105,66 @@ export function initializeDatabase() {
       created_at INTEGER,
       updated_at INTEGER
     );
+
+    -- Expert Agent Tables
+    CREATE TABLE IF NOT EXISTS domains (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      description TEXT,
+      icon TEXT,
+      agent_id TEXT,
+      system_prompt TEXT,
+      created_at INTEGER,
+      updated_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS scenarios (
+      id TEXT PRIMARY KEY,
+      workflow_id TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+      domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+      tool_name TEXT NOT NULL,
+      name TEXT NOT NULL,
+      short_description TEXT NOT NULL,
+      when_to_apply TEXT NOT NULL,
+      inputs_schema TEXT,
+      outputs_schema TEXT,
+      risk_class TEXT DEFAULT 'read_only',
+      estimated_duration TEXT DEFAULT 'fast',
+      enabled INTEGER DEFAULT 1,
+      created_at INTEGER,
+      updated_at INTEGER,
+      UNIQUE(domain_id, tool_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS cases (
+      id TEXT PRIMARY KEY,
+      domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+      title TEXT,
+      status TEXT DEFAULT 'open',
+      openclaw_session_id TEXT,
+      summary TEXT,
+      created_at INTEGER,
+      updated_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS case_steps (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+      step_index INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      content TEXT,
+      execution_id TEXT REFERENCES executions(id),
+      scenario_id TEXT REFERENCES scenarios(id),
+      created_at INTEGER
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_scenarios_domain_id ON scenarios(domain_id);
+    CREATE INDEX IF NOT EXISTS idx_scenarios_workflow_id ON scenarios(workflow_id);
+    CREATE INDEX IF NOT EXISTS idx_cases_domain_id ON cases(domain_id);
+    CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
+    CREATE INDEX IF NOT EXISTS idx_case_steps_case_id ON case_steps(case_id);
+    CREATE INDEX IF NOT EXISTS idx_case_steps_execution_id ON case_steps(execution_id);
   `);
 
   console.log('Database initialized');

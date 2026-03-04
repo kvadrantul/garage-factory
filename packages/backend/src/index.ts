@@ -10,8 +10,12 @@ import { executionsRouter } from './api/executions.js';
 import { hitlRouter } from './api/hitl.js';
 import { credentialsRouter } from './api/credentials.js';
 import { customNodesRouter } from './api/custom-nodes.js';
+import { bridgeRouter } from './api/bridge.js';
+import { chatRouter } from './api/chat.js';
+import { expertRouter } from './api/expert.js';
 import { webhookRouter } from './webhooks/webhook-handler.js';
 import { initExecutionService } from './services/execution-service.js';
+import { executionEventBus } from './services/sync-executor.js';
 import { initScheduler } from './services/scheduler.js';
 import { loadCustomNodes } from './nodes/custom/custom-node-loader.js';
 
@@ -48,6 +52,9 @@ export function broadcastExecutionEvent(
 
   // Also broadcast to all clients (for dashboard updates)
   broadcastAll(event);
+
+  // Emit to sync executor event bus for blocking execution
+  executionEventBus.emit(event.type, event.payload);
 }
 
 function broadcastAll(event: { type: string; payload: unknown }) {
@@ -68,6 +75,9 @@ app.use('/api/executions', executionsRouter);
 app.use('/api/hitl', hitlRouter);
 app.use('/api/credentials', credentialsRouter);
 app.use('/api/custom-nodes', customNodesRouter);
+app.use('/api/bridge', bridgeRouter);
+app.use('/api/chat', chatRouter);
+app.use('/api/expert', expertRouter);
 
 // Webhook Handler
 app.use('/webhooks', webhookRouter);

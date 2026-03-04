@@ -295,3 +295,117 @@ export interface CustomNodeManifest {
   properties: PropertyDefinition[];
   code: string;
 }
+
+// ============================================
+// EXPERT AGENT TYPES
+// ============================================
+
+export type RiskClass = 'read_only' | 'write' | 'financial' | 'legal_opinion';
+export type EstimatedDuration = 'fast' | 'medium' | 'long';
+export type CaseStatus = 'open' | 'completed' | 'abandoned';
+export type CaseStepType = 'tool_call' | 'tool_result' | 'hitl_request' | 'hitl_response';
+
+export interface Domain {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  agentId?: string;
+  systemPrompt?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Scenario {
+  id: string;
+  workflowId: string;
+  domainId: string;
+  toolName: string;
+  name: string;
+  shortDescription: string;
+  whenToApply: string;
+  inputsSchema?: Record<string, unknown>;
+  outputsSchema?: Record<string, unknown>;
+  riskClass: RiskClass;
+  estimatedDuration: EstimatedDuration;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Case {
+  id: string;
+  domainId: string;
+  title?: string;
+  status: CaseStatus;
+  openclawSessionId?: string;
+  summary?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CaseStep {
+  id: string;
+  caseId: string;
+  stepIndex: number;
+  type: CaseStepType;
+  content?: Record<string, unknown>;
+  executionId?: string;
+  scenarioId?: string;
+  createdAt: Date;
+}
+
+// ============================================
+// BRIDGE API TYPES
+// ============================================
+
+export interface CatalogEntry {
+  toolName: string;
+  name: string;
+  shortDescription: string;
+  whenToApply: string;
+  inputsSchema?: Record<string, unknown>;
+  outputsSchema?: Record<string, unknown>;
+  riskClass: RiskClass;
+  estimatedDuration: EstimatedDuration;
+}
+
+export interface BridgeRunRequest {
+  domain_id: string;
+  tool_name: string;
+  inputs: Record<string, unknown>;
+  case_id: string;
+}
+
+export interface BridgeRunResponse {
+  job_id: string;
+  status: 'running' | 'completed' | 'failed' | 'waiting_hitl';
+  outputs?: Record<string, unknown>;
+  error?: string;
+  hitl_request_id?: string;
+}
+
+export interface BridgeStatusResponse {
+  job_id: string;
+  status: 'running' | 'completed' | 'failed' | 'waiting_hitl';
+  outputs?: Record<string, unknown>;
+  error?: string;
+  hitl_request?: {
+    id: string;
+    type: HITLType;
+    message: string;
+    details?: string;
+    fields?: HITLField[];
+    options?: HITLOption[];
+  };
+}
+
+export interface SyncExecuteResult {
+  executionId: string;
+  status: ExecutionStatus;
+  outputs?: Record<string, unknown>;
+  error?: string;
+  hitlRequestId?: string;
+  durationMs: number;
+}

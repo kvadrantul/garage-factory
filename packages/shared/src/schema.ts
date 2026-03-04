@@ -153,6 +153,112 @@ export const customNodes = sqliteTable('custom_nodes', {
 });
 
 // ============================================
+// EXPERT AGENT: DOMAINS
+// ============================================
+export const domains = sqliteTable('domains', {
+  id: text('id').primaryKey().$defaultFn(generateId),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  description: text('description'),
+  icon: text('icon'),
+  agentId: text('agent_id'),
+  systemPrompt: text('system_prompt'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// ============================================
+// EXPERT AGENT: SCENARIOS (TOOLS)
+// ============================================
+export const scenarios = sqliteTable('scenarios', {
+  id: text('id').primaryKey().$defaultFn(generateId),
+  workflowId: text('workflow_id').notNull().references(() => workflows.id, { onDelete: 'cascade' }),
+  domainId: text('domain_id').notNull().references(() => domains.id, { onDelete: 'cascade' }),
+  toolName: text('tool_name').notNull(),
+  name: text('name').notNull(),
+  shortDescription: text('short_description').notNull(),
+  whenToApply: text('when_to_apply').notNull(),
+  inputsSchema: text('inputs_schema', { mode: 'json' }),
+  outputsSchema: text('outputs_schema', { mode: 'json' }),
+  riskClass: text('risk_class', { enum: ['read_only', 'write', 'financial', 'legal_opinion'] }).default('read_only'),
+  estimatedDuration: text('estimated_duration', { enum: ['fast', 'medium', 'long'] }).default('fast'),
+  enabled: integer('enabled', { mode: 'boolean' }).default(true),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// ============================================
+// EXPERT AGENT: CASES (SESSIONS)
+// ============================================
+export const cases = sqliteTable('cases', {
+  id: text('id').primaryKey().$defaultFn(generateId),
+  domainId: text('domain_id').notNull().references(() => domains.id, { onDelete: 'cascade' }),
+  title: text('title'),
+  status: text('status', { enum: ['open', 'completed', 'abandoned'] }).default('open'),
+  openclawSessionId: text('openclaw_session_id'),
+  summary: text('summary'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// ============================================
+// EXPERT AGENT: CASE STEPS
+// ============================================
+export const caseSteps = sqliteTable('case_steps', {
+  id: text('id').primaryKey().$defaultFn(generateId),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  stepIndex: integer('step_index').notNull(),
+  type: text('type', { enum: ['tool_call', 'tool_result', 'hitl_request', 'hitl_response'] }).notNull(),
+  content: text('content', { mode: 'json' }),
+  executionId: text('execution_id').references(() => executions.id),
+  scenarioId: text('scenario_id').references(() => scenarios.id),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// ============================================
+// EXPERT AGENT RELATIONS
+// ============================================
+export const domainsRelations = relations(domains, ({ many }) => ({
+  scenarios: many(scenarios),
+  cases: many(cases),
+}));
+
+export const scenariosRelations = relations(scenarios, ({ one, many }) => ({
+  workflow: one(workflows, {
+    fields: [scenarios.workflowId],
+    references: [workflows.id],
+  }),
+  domain: one(domains, {
+    fields: [scenarios.domainId],
+    references: [domains.id],
+  }),
+  caseSteps: many(caseSteps),
+}));
+
+export const casesRelations = relations(cases, ({ one, many }) => ({
+  domain: one(domains, {
+    fields: [cases.domainId],
+    references: [domains.id],
+  }),
+  steps: many(caseSteps),
+}));
+
+export const caseStepsRelations = relations(caseSteps, ({ one }) => ({
+  case: one(cases, {
+    fields: [caseSteps.caseId],
+    references: [cases.id],
+  }),
+  execution: one(executions, {
+    fields: [caseSteps.executionId],
+    references: [executions.id],
+  }),
+  scenario: one(scenarios, {
+    fields: [caseSteps.scenarioId],
+    references: [scenarios.id],
+  }),
+}));
+
+// ============================================
 // TYPE IMPORTS (from types.ts)
 // ============================================
 import type { WorkflowDefinition, WorkflowSettings, CustomNodeManifest } from './types';

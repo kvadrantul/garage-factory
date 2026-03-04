@@ -48,6 +48,7 @@ export function AppHeader({ children }: { children?: React.ReactNode }) {
             {navLink('/credentials', 'Credentials')}
             {navLink('/hitl', 'HITL Requests')}
             {navLink('/custom-nodes', 'Custom Nodes')}
+            {navLink('/domains', 'Expert Agent')}
           </nav>
         </div>
         <div className="flex items-center gap-3">
