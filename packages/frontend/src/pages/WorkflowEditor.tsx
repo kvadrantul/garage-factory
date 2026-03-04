@@ -1,7 +1,7 @@
 // Workflow Editor Page
 
 import { useEffect, useCallback, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import ReactFlow, {
   Background,
@@ -12,14 +12,16 @@ import ReactFlow, {
   useEdgesState,
   type Connection,
   type Node,
+  type Edge,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Save, Play, ArrowLeft, Moon, Sun, History } from 'lucide-react';
+import { Save, Play, ArrowLeft, Moon, Sun, History, Sparkles } from 'lucide-react';
 import { workflowsApi, executionsApi, customNodesApi } from '@/api/client';
 import { NodePalette } from '@/components/canvas/NodePalette';
 import { NDVPanel } from '@/components/panels/NDVPanel';
 import { HITLPanel } from '@/components/panels/HITLPanel';
 import { ExecutionHistorySidebar } from '@/components/panels/ExecutionHistorySidebar';
+import { SkillGenerationPanel } from '@/components/panels/SkillGenerationPanel';
 import { WorkflowNode } from '@/components/nodes/WorkflowNode';
 import { DeletableEdge } from '@/components/edges/DeletableEdge';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -54,7 +56,9 @@ const allNodeTypes = [
 export function WorkflowEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isNew = !id;
+  const isGenerateMode = searchParams.get('generate') === 'true';
   
   // Local state (no Zustand store sync to avoid infinite loops)
   const [workflowName, setWorkflowName] = useState('Untitled Workflow');
@@ -63,6 +67,7 @@ export function WorkflowEditor() {
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [hitlRequest, setHitlRequest] = useState<HITLRequest | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showGenPanel, setShowGenPanel] = useState(isGenerateMode);
   const { theme, toggle: toggleTheme } = useTheme();
   const { toast } = useToast();
 
@@ -460,6 +465,7 @@ export function WorkflowEditor() {
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       setSelectedNodeId(node.id);
+      setShowGenPanel(false);
     },
     [],
   );
@@ -518,6 +524,43 @@ export function WorkflowEditor() {
     [setNodes, deleteNode],
   );
 
+  // Handle generated workflow loaded from SkillGenerationPanel
+  const handleWorkflowGenerated = useCallback(
+    (newNodes: Node[], newEdges: Edge[], name: string) => {
+      const nodesWithCallbacks = newNodes.map((n) => ({
+        ...n,
+        data: { ...n.data, onDelete: deleteNode },
+      }));
+      const edgesWithCallbacks = newEdges.map((e) => ({
+        ...e,
+        type: 'deletable',
+        data: { ...e.data, onDelete: deleteEdge },
+      }));
+      setNodes(nodesWithCallbacks);
+      setEdges(edgesWithCallbacks);
+      setWorkflowName(name);
+      setIsDirty(true);
+    },
+    [setNodes, setEdges, deleteNode, deleteEdge],
+  );
+
+  // Mutual exclusivity helpers for right panels
+  const handleOpenGenPanel = useCallback(() => {
+    setShowGenPanel(true);
+    setSelectedNodeId(null);
+    setShowHistory(false);
+  }, []);
+
+  const handleToggleHistory = useCallback(() => {
+    setShowHistory((prev) => {
+      if (!prev) {
+        setShowGenPanel(false);
+        setSelectedNodeId(null);
+      }
+      return !prev;
+    });
+  }, []);
+
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
@@ -574,7 +617,7 @@ export function WorkflowEditor() {
           )}
           {!isNew && (
             <button
-              onClick={() => setShowHistory(!showHistory)}
+              onClick={handleToggleHistory}
               className={`p-2 rounded transition-colors ${
                 showHistory 
                   ? 'bg-accent text-foreground' 
@@ -585,6 +628,17 @@ export function WorkflowEditor() {
               <History size={16} />
             </button>
           )}
+          <button
+            onClick={handleOpenGenPanel}
+            className={`p-2 rounded transition-colors ${
+              showGenPanel
+                ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            }`}
+            title="Generate Skill"
+          >
+            <Sparkles size={16} />
+          </button>
           <button
             onClick={toggleTheme}
             className="p-2 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -643,6 +697,14 @@ export function WorkflowEditor() {
               // TODO: Load execution details and visualize node states
               console.log('Selected execution:', execId);
             }}
+          />
+        )}
+
+        {/* Skill Generation Panel */}
+        {showGenPanel && (
+          <SkillGenerationPanel
+            onClose={() => setShowGenPanel(false)}
+            onWorkflowGenerated={handleWorkflowGenerated}
           />
         )}
       </div>

@@ -17,6 +17,7 @@ import { expertRouter } from './api/expert.js';
 import { artifactsRouter } from './api/artifacts.js';
 import { nodesRouter } from './api/nodes.js';
 import { skillsRouter } from './api/skills.js';
+import { skillsChatRouter } from './api/skills-chat.js';
 import { webhookRouter } from './webhooks/webhook-handler.js';
 import { initExecutionService } from './services/execution-service.js';
 import { executionEventBus } from './services/sync-executor.js';
@@ -86,6 +87,7 @@ app.use('/api/expert', expertRouter);
 app.use('/api/artifacts', artifactsRouter);
 app.use('/api/nodes', nodesRouter);
 app.use('/api/skills', skillsRouter);
+app.use('/api/skills/chat', skillsChatRouter);
 
 // Webhook Handler
 app.use('/webhooks', webhookRouter);

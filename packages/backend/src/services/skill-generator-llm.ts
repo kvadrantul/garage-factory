@@ -33,7 +33,7 @@ function buildNodeCatalogText(manifests: DocumentNodeManifest[]): string {
           : '';
       lines.push(`  - ${p.name} (${p.type})${req}${def}: ${p.description || ''}${opts}`);
     }
-    lines.push(`Output fields: ${m.dataContract.outputFields.join(', ')}`);
+    lines.push(`Output fields: ${(m.dataContract.outputFields ?? []).join(', ')}`);
     lines.push(`Data flow: ${m.dataContract.inputShape} → ${m.dataContract.outputShape}`);
     lines.push('');
   }
@@ -42,11 +42,64 @@ function buildNodeCatalogText(manifests: DocumentNodeManifest[]): string {
 }
 
 /**
+ * Core (non-document) node catalog for general-purpose workflow generation.
+ */
+function buildCoreNodeCatalogText(): string {
+  return `### http-request (action)
+Make an HTTP request to any URL.
+Properties:
+  - url (string) (REQUIRED): The URL to send the request to
+  - method (string) [default: "GET"]: HTTP method. Options: GET, POST, PUT, DELETE, PATCH
+  - headers (json): HTTP headers as a JSON object, e.g. {"Content-Type": "application/json"}
+  - body (json): Request body (for POST/PUT/PATCH)
+  - timeout (number) [default: 30000]: Timeout in milliseconds
+Output: { statusCode, headers, body }
+
+### code (action)
+Execute custom JavaScript code. Has access to $input (previous node output), $inputs (all inputs), and can return any value.
+Properties:
+  - code (string) (REQUIRED): JavaScript code to execute. Use "return <value>" to output data. Has access to $input, $inputs, $node, $execution, console.
+Output: { result, logs }
+
+### set (action)
+Set, append, or remove fields on the data object.
+Properties:
+  - values (json) (REQUIRED): Key-value pairs to set, e.g. {"status": "done", "count": 42}
+  - mode (string) [default: "set"]: Options: set, append, remove
+  - keepOnlySet (boolean) [default: false]: If true, discard fields not in values
+Output: Modified data object
+
+### if (logic)
+Conditional branching. Routes data to output 0 (true) or output 1 (false) based on conditions.
+Properties:
+  - conditions (json) (REQUIRED): Array of conditions, e.g. [{"field": "statusCode", "operation": "equals", "value": 200}]. Operations: equals, notEquals, contains, gt, lt, gte, lte, isEmpty, isNotEmpty
+  - combineOperation (string) [default: "AND"]: How to combine multiple conditions. Options: AND, OR
+Output 0 (true): Input passes through if conditions match
+Output 1 (false): Input passes through if conditions don't match
+
+### switch (logic)
+Multi-way branching based on a value.
+Properties:
+  - value (string) (REQUIRED): Dot-notation path to the value to switch on
+  - cases (json) (REQUIRED): Array of cases, e.g. [{"value": "success", "label": "On success"}, {"value": "error", "label": "On error"}]
+  - fallback (boolean) [default: false]: Include a fallback output if no case matches
+Output: One output per case (+ fallback)
+
+### merge (logic)
+Merge multiple inputs into one.
+Properties:
+  - mode (string) [default: "append"]: Options: append (concat arrays), combine (deep merge objects), wait (wait for all)
+Output: Merged data
+
+`;
+}
+
+/**
  * Build the system prompt for the skill generation LLM call.
  */
 function buildSystemPrompt(catalog: string): string {
   return `## Role
-You are a workflow architect for a document processing system.
+You are a workflow architect for an automation system.
 Your job is to design a minimal, correct workflow from a natural language description.
 Return ONLY valid JSON. No markdown, no prose, no explanation — just the JSON object.
 
@@ -57,7 +110,8 @@ ${catalog}
 - Runtime inputs (from user at execution time): {{ $input.bridgeInputs.PARAM_NAME }}
 - Upstream node output: {{ $node["NodeName"].FIELD_NAME }}
 - Use expressions wherever a value should come from user input or a previous step.
-- Data (rows) flows automatically between connected nodes — you do NOT need expressions for the rows array itself. Only use expressions for config properties like column names, thresholds, file paths, etc.
+- For document pipelines, data (rows) flows automatically between connected nodes — you do NOT need expressions for the rows array itself. Only use expressions for config properties like column names, thresholds, file paths, etc.
+- For general workflows, use {{ $node["PreviousStepName"].FIELD }} to reference output from previous nodes.
 
 ## Output Format
 Return ONLY a JSON object matching this exact structure:
@@ -73,52 +127,22 @@ Return ONLY a JSON object matching this exact structure:
   "inputsSchema": {
     "type": "object",
     "properties": {
-      "filePath": { "type": "string", "description": "Path to the input file" }
+      "param1": { "type": "string", "description": "Description of the parameter" }
     },
-    "required": ["filePath"]
+    "required": ["param1"]
   }
 }
 
 ## Rules
 1. Only use node types from the catalog above. Never invent new types.
-2. Every workflow that reads a file MUST start with "read-excel".
-3. Every workflow that produces a file MUST end with "write-excel".
-4. Every workflow that should produce text output (not a file) should end with "format-output".
-5. Parameters that come from the user at runtime MUST use {{ $input.bridgeInputs.X }} expressions in the config.
-6. Include ALL runtime parameters in inputsSchema with proper types and descriptions.
-7. filePath is almost always a required input — include it in inputsSchema.
-8. Keep the pipeline minimal: only include nodes that are necessary.
-9. Node "name" should be descriptive (e.g. "Filter by Amount", not "filter-rows-1").
-10. toolName must be snake_case, 3–50 characters, starting with a letter.
-
-## Example
-
-Description: "Read an Excel bank statement, filter transactions where amount is greater than a threshold, group by counterparty BIK, output a summary Excel file"
-
-Response:
-{
-  "workflowName": "Filter and group transactions by BIK",
-  "nodes": [
-    { "type": "read-excel", "name": "Read Statement", "config": { "filePath": "{{ $input.bridgeInputs.filePath }}", "hasHeader": true } },
-    { "type": "filter-rows", "name": "Filter by Amount", "config": { "column": "{{ $input.bridgeInputs.amountColumn }}", "operator": "gt", "value": "{{ $input.bridgeInputs.threshold }}", "valueType": "number" } },
-    { "type": "group-by", "name": "Group by BIK", "config": { "groupColumn": "{{ $input.bridgeInputs.bikColumn }}", "aggregations": [{"column": "{{ $input.bridgeInputs.amountColumn }}", "fn": "sum", "outputColumn": "total_amount"}, {"column": "{{ $input.bridgeInputs.amountColumn }}", "fn": "count", "outputColumn": "transaction_count"}] } },
-    { "type": "write-excel", "name": "Write Summary", "config": { "fileName": "summary.xlsx", "sheetName": "Summary" } }
-  ],
-  "toolName": "filter_transactions_by_bik",
-  "name": "Filter Transactions by BIK",
-  "shortDescription": "Filters bank statement transactions above a threshold and groups them by counterparty BIK",
-  "whenToApply": "Use when the user asks to analyze or summarize transactions from a bank statement Excel file by BIK or counterparty",
-  "inputsSchema": {
-    "type": "object",
-    "properties": {
-      "filePath": { "type": "string", "description": "Path to the Excel bank statement file" },
-      "threshold": { "type": "number", "description": "Minimum transaction amount to include", "default": 1000000 },
-      "amountColumn": { "type": "string", "description": "Column name containing the transaction amount", "default": "amount" },
-      "bikColumn": { "type": "string", "description": "Column name containing the BIK/counterparty code", "default": "bik" }
-    },
-    "required": ["filePath"]
-  }
-}`;
+2. For document processing: workflows that read a file MUST start with "read-excel" and workflows that produce a file MUST end with "write-excel".
+3. For general automation: use "http-request", "code", "set", "if", "switch", "merge" as needed.
+4. Parameters that come from the user at runtime MUST use {{ $input.bridgeInputs.X }} expressions in the config.
+5. Include ALL runtime parameters in inputsSchema with proper types and descriptions.
+6. Keep the pipeline minimal: only include nodes that are necessary.
+7. Node "name" should be descriptive (e.g. "Fetch Google", not "http-request-1").
+8. toolName must be snake_case, 3–50 characters, starting with a letter.
+9. If the workflow needs no runtime parameters, inputsSchema.properties can be empty and required can be [].`;
 }
 
 /**
@@ -142,6 +166,8 @@ function buildUserMessage(
 
 /**
  * Spawn OpenClaw CLI for one-shot generation.
+ * Note: openclaw agent does not support --system, so we embed the system
+ * prompt directly inside the message body.
  */
 function callOpenClawForGeneration(
   agentId: string,
@@ -149,7 +175,11 @@ function callOpenClawForGeneration(
   userMessage: string,
 ): Promise<{ content: string; error?: string }> {
   return new Promise((resolve) => {
-    const args = ['agent', '--agent', agentId, '--system', systemPrompt, '-m', userMessage, '--json'];
+    const combinedMessage = `${systemPrompt}\n\n---\n\n${userMessage}`;
+    const sessionId = `skill-gen-${Date.now()}`;
+    const args = ['agent', '--agent', agentId, '--session-id', sessionId, '-m', combinedMessage, '--json', '--timeout', '180'];
+
+    console.log(`[skill-gen] Combined message: ${combinedMessage.length} chars`);
 
     const proc = spawn('openclaw', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -183,12 +213,42 @@ function callOpenClawForGeneration(
       }
     });
 
-    // 90 second timeout
+    // 3 minute timeout
     setTimeout(() => {
       proc.kill();
-      resolve({ content: '', error: 'Generation timed out (90s)' });
-    }, 90_000);
+      resolve({ content: '', error: 'Generation timed out (180s)' });
+    }, 180_000);
   });
+}
+
+/**
+ * Extract a JSON object from free-form text (may include markdown fences, prose, etc.).
+ */
+function extractJsonFromText(text: string): Record<string, unknown> {
+  // Try direct JSON parse first
+  try {
+    const parsed = JSON.parse(text);
+    if (typeof parsed === 'object' && parsed !== null) return parsed;
+  } catch { /* not direct JSON */ }
+
+  // Strip ```json ... ``` fences
+  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  if (fenceMatch) {
+    try {
+      return JSON.parse(fenceMatch[1].trim());
+    } catch { /* fall through */ }
+  }
+
+  // Find first { to last }
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(text.slice(firstBrace, lastBrace + 1));
+    } catch { /* fall through */ }
+  }
+
+  throw new Error(`Could not parse JSON from text: ${text.slice(0, 200)}...`);
 }
 
 /**
@@ -198,9 +258,19 @@ function parseGenerationResponse(content: string): Record<string, unknown> {
   // Try parsing the --json structured output first
   try {
     const parsed = JSON.parse(content);
-    // OpenClaw --json wraps response in { content: "..." } or similar
+
+    // OpenClaw --json output: { result: { payloads: [{ text: "..." }] } }
+    if (parsed.result?.payloads && Array.isArray(parsed.result.payloads)) {
+      const text = parsed.result.payloads[0]?.text;
+      if (typeof text === 'string') {
+        console.log(`[skill-gen] Extracted text from OpenClaw payloads (${text.length} chars)`);
+        return extractJsonFromText(text);
+      }
+    }
+
+    // OpenClaw --json may wrap response in { content: "..." }
     if (parsed.content && typeof parsed.content === 'string') {
-      return parseGenerationResponse(parsed.content);
+      return extractJsonFromText(parsed.content);
     }
     // If parsed object looks like our expected shape, return it
     if (parsed.workflowName || parsed.nodes) {
@@ -209,35 +279,14 @@ function parseGenerationResponse(content: string): Record<string, unknown> {
     // If it's some other wrapper, check for a text/message field
     const text = parsed.text || parsed.message || parsed.response || parsed.content;
     if (typeof text === 'string') {
-      return parseGenerationResponse(text);
+      return extractJsonFromText(text);
     }
     return parsed;
   } catch {
-    // Not direct JSON — try extracting from markdown fences or prose
+    // Not direct JSON — try extracting from text
   }
 
-  // Strip ```json ... ``` fences
-  const fenceMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-  if (fenceMatch) {
-    try {
-      return JSON.parse(fenceMatch[1].trim());
-    } catch {
-      // Fall through
-    }
-  }
-
-  // Find first { to last }
-  const firstBrace = content.indexOf('{');
-  const lastBrace = content.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    try {
-      return JSON.parse(content.slice(firstBrace, lastBrace + 1));
-    } catch {
-      // Fall through
-    }
-  }
-
-  throw new Error(`Could not parse JSON from LLM response: ${content.slice(0, 200)}...`);
+  return extractJsonFromText(content);
 }
 
 // Draft shape returned by the LLM
@@ -349,7 +398,7 @@ function convertDraftToWorkflow(draft: WorkflowDraft): WorkflowDefinition {
 
 export interface GenerateParams {
   description: string;
-  domainId: string;
+  domainId?: string;
   agentId: string;
   domainSystemPrompt?: string;
   sampleData?: Record<string, unknown>[];
@@ -360,8 +409,12 @@ export async function generateWorkflowFromDescription(
 ): Promise<SkillGenerationResult> {
   const { description, agentId, sampleData } = params;
 
-  const validNodeTypes = new Set(documentNodeManifests.map((m) => m.id));
-  const catalog = buildNodeCatalogText(documentNodeManifests);
+  const coreNodeTypes = ['http-request', 'code', 'set', 'if', 'switch', 'merge'];
+  const validNodeTypes = new Set([
+    ...documentNodeManifests.map((m) => m.id),
+    ...coreNodeTypes,
+  ]);
+  const catalog = buildNodeCatalogText(documentNodeManifests) + '\n' + buildCoreNodeCatalogText();
   const systemPrompt = buildSystemPrompt(catalog);
   const userMessage = buildUserMessage(description, sampleData);
 
@@ -373,8 +426,15 @@ export async function generateWorkflowFromDescription(
       : `${userMessage}\n\nCORRECTION NEEDED: ${lastError}\nReturn ONLY valid JSON, no other text.`;
 
     console.log(`[skill-gen] Attempt ${attempt + 1}: calling OpenClaw CLI for agent ${agentId}`);
+    console.log(`[skill-gen] Message length: ${msg.length} chars`);
 
     const result = await callOpenClawForGeneration(agentId, systemPrompt, msg);
+
+    console.log(`[skill-gen] OpenClaw response length: ${result.content.length} chars`);
+    console.log(`[skill-gen] OpenClaw response (first 500): ${result.content.slice(0, 500)}`);
+    if (result.error) {
+      console.warn(`[skill-gen] OpenClaw stderr: ${result.error.slice(0, 500)}`);
+    }
 
     if (result.error && !result.content) {
       throw new Error(`OpenClaw CLI error: ${result.error}`);

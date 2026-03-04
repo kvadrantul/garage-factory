@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Play, Trash2 } from 'lucide-react';
+import { Plus, Play, Trash2, Sparkles } from 'lucide-react';
 import { workflowsApi } from '@/api/client';
 
 export function WorkflowList() {
@@ -36,13 +36,22 @@ export function WorkflowList() {
             Build and manage automation workflows with visual editor
           </p>
         </div>
-        <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-        >
-          <Plus size={20} />
-          New Workflow
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/workflows/new?generate=true')}
+            className="flex items-center gap-2 px-4 py-2 border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-400 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
+          >
+            <Sparkles size={18} />
+            Generate Skill
+          </button>
+          <button
+            onClick={handleCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+          >
+            <Plus size={20} />
+            New Workflow
+          </button>
+        </div>
       </div>
 
       {isLoading ? (

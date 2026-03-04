@@ -336,3 +336,23 @@ export const skillsApi = {
       body: JSON.stringify({ workflowId, sampleFilePath }),
     }),
 };
+
+// Skills Chat API (chat-based skill generation)
+export const skillsChatApi = {
+  start: () =>
+    request<{ sessionId: string; steps: any[] }>('/skills/chat/start', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
+  send: (sessionId: string, message: string, sampleFile?: File) => {
+    const fd = new FormData();
+    fd.append('sessionId', sessionId);
+    fd.append('message', message);
+    if (sampleFile) fd.append('sampleFile', sampleFile);
+    return requestFormData<{ steps: any[] }>('/skills/chat/send', fd);
+  },
+
+  history: (sessionId: string) =>
+    request<{ steps: any[] }>(`/skills/chat/history/${sessionId}`),
+};
