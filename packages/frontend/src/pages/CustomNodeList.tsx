@@ -40,7 +40,7 @@ export function CustomNodeList() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Custom Nodes</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1">
             Manage custom workflow nodes built on top of the Code engine
           </p>
         </div>
@@ -66,71 +66,72 @@ export function CustomNodeList() {
               </button>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {nodes.map((node: any) => {
                 const IconComponent = resolveIcon(node.icon);
                 return (
                   <div
                     key={node.id}
-                    className="flex items-center justify-between p-4 bg-card border border-border rounded-lg hover:border-accent transition-colors"
+                    className="bg-card rounded-lg border border-border p-5 hover:shadow-md transition-shadow"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                        <IconComponent size={20} className="text-muted-foreground" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-foreground">{node.name}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${categoryBadgeColors[node.category] || categoryBadgeColors.utility}`}>
-                            {node.category}
-                          </span>
-                          {node.isBuiltin && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                              built-in
-                            </span>
-                          )}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                          <IconComponent size={20} className="text-muted-foreground" />
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {node.description || `ID: ${node.id}`}
-                        </p>
+                        <div>
+                          <span className="font-medium text-foreground">{node.name}</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${categoryBadgeColors[node.category] || categoryBadgeColors.utility}`}>
+                              {node.category}
+                            </span>
+                            {node.isBuiltin && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                built-in
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {!node.isBuiltin && (
+                          <button
+                            onClick={() => toggleMutation.mutate(node.id)}
+                            className="p-1.5 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
+                            title={node.enabled ? 'Disable' : 'Enable'}
+                          >
+                            {node.enabled ? (
+                              <ToggleRight size={18} className="text-green-500" />
+                            ) : (
+                              <ToggleLeft size={18} />
+                            )}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => navigate(`/custom-nodes/${node.id}/edit`)}
+                          className="p-1.5 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
+                          title="Edit"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        {!node.isBuiltin && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Delete custom node "${node.name}"?`)) {
+                                deleteMutation.mutate(node.id);
+                              }
+                            }}
+                            className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors text-muted-foreground hover:text-red-600"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      {!node.isBuiltin && (
-                        <button
-                          onClick={() => toggleMutation.mutate(node.id)}
-                          className="p-2 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
-                          title={node.enabled ? 'Disable' : 'Enable'}
-                        >
-                          {node.enabled ? (
-                            <ToggleRight size={20} className="text-green-500" />
-                          ) : (
-                            <ToggleLeft size={20} />
-                          )}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => navigate(`/custom-nodes/${node.id}/edit`)}
-                        className="p-2 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
-                        title="Edit"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      {!node.isBuiltin && (
-                        <button
-                          onClick={() => {
-                            if (confirm(`Delete custom node "${node.name}"?`)) {
-                              deleteMutation.mutate(node.id);
-                            }
-                          }}
-                          className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors text-muted-foreground hover:text-red-600"
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
+                    <p className="text-sm text-muted-foreground mt-3 line-clamp-2">
+                      {node.description || `ID: ${node.id}`}
+                    </p>
                   </div>
                 );
               })}

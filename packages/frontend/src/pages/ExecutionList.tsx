@@ -46,7 +46,14 @@ export function ExecutionList() {
 
   return (
     <main className="p-6">
-      <h2 className="text-xl font-semibold text-foreground mb-6">Executions</h2>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Executions</h1>
+          <p className="text-muted-foreground mt-1">
+            Monitor workflow runs, view statuses, and inspect results
+          </p>
+        </div>
+      </div>
 
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Loading...</div>

@@ -216,6 +216,22 @@ export const caseSteps = sqliteTable('case_steps', {
 });
 
 // ============================================
+// EXPERT AGENT: CASE ARTIFACTS
+// ============================================
+export const caseArtifacts = sqliteTable('case_artifacts', {
+  id: text('id').primaryKey().$defaultFn(generateId),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  filePath: text('file_path').notNull(),
+  mimeType: text('mime_type').notNull(),
+  size: integer('size').notNull().default(0),
+  sourceType: text('source_type', { enum: ['upload', 'skill_output', 'generated'] }).notNull(),
+  sourceStepId: text('source_step_id').references(() => caseSteps.id),
+  metadata: text('metadata', { mode: 'json' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// ============================================
 // EXPERT AGENT RELATIONS
 // ============================================
 export const domainsRelations = relations(domains, ({ many }) => ({
@@ -241,6 +257,7 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
     references: [domains.id],
   }),
   steps: many(caseSteps),
+  artifacts: many(caseArtifacts),
 }));
 
 export const caseStepsRelations = relations(caseSteps, ({ one }) => ({
@@ -255,6 +272,17 @@ export const caseStepsRelations = relations(caseSteps, ({ one }) => ({
   scenario: one(scenarios, {
     fields: [caseSteps.scenarioId],
     references: [scenarios.id],
+  }),
+}));
+
+export const caseArtifactsRelations = relations(caseArtifacts, ({ one }) => ({
+  case: one(cases, {
+    fields: [caseArtifacts.caseId],
+    references: [cases.id],
+  }),
+  sourceStep: one(caseSteps, {
+    fields: [caseArtifacts.sourceStepId],
+    references: [caseSteps.id],
   }),
 }));
 

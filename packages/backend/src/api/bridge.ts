@@ -6,7 +6,11 @@ import { db, schema } from '../db/index.js';
 import { eq, and } from 'drizzle-orm';
 import { bridgeAuth, type AuthenticatedRequest } from './bridge-auth.js';
 import { executeWorkflowSync, getExecutionResult } from '../services/sync-executor.js';
+import { createArtifact, findArtifactByName, inferMimeType } from '../services/artifact-service.js';
 import crypto from 'crypto';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { nanoid } from 'nanoid';
 import type {
   CatalogEntry,
   BridgeRunRequest,
@@ -206,11 +210,22 @@ bridgeRouter.post('/run', async (req: AuthenticatedRequest, res) => {
       scenarioId: scenario.id,
     });
 
+    // Resolve artifact names in inputs to actual file paths
+    const resolvedInputs = { ...(inputs || {}) };
+    for (const [key, value] of Object.entries(resolvedInputs)) {
+      if (typeof value === 'string' && value.length > 0 && !value.startsWith('/') && !value.startsWith('uploads/') && !value.startsWith('artifacts/')) {
+        const artifact = findArtifactByName(case_id, value);
+        if (artifact) {
+          resolvedInputs[key] = artifact.filePath;
+        }
+      }
+    }
+
     // Execute workflow synchronously
     const result = await executeWorkflowSync(
       scenario.workflowId,
       'manual',
-      { bridgeInputs: inputs || {}, caseId: case_id, scenarioId: scenario.id },
+      { bridgeInputs: resolvedInputs, caseId: case_id, scenarioId: scenario.id },
     );
 
     // Cache the result for deduplication
@@ -220,7 +235,9 @@ bridgeRouter.post('/run', async (req: AuthenticatedRequest, res) => {
     });
 
     // Log tool_result step
+    const toolResultStepId = nanoid(16);
     await db.insert(schema.caseSteps).values({
+      id: toolResultStepId,
       caseId: case_id,
       stepIndex: nextStepIndex + 1,
       type: result.status === 'waiting_hitl' ? 'hitl_request' : 'tool_result',
@@ -234,6 +251,36 @@ bridgeRouter.post('/run', async (req: AuthenticatedRequest, res) => {
       executionId: result.executionId,
       scenarioId: scenario.id,
     });
+
+    // Detect file outputs and create artifacts
+    if (result.status === 'completed' && result.outputs) {
+      const outputs = result.outputs as Record<string, unknown>;
+      const filePath = outputs.filePath as string | undefined;
+      if (filePath && typeof filePath === 'string') {
+        const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+        if (fs.existsSync(absolutePath)) {
+          try {
+            const stat = fs.statSync(absolutePath);
+            const metadata: Record<string, unknown> = {};
+            if (outputs.rowCount != null) metadata.rowCount = outputs.rowCount;
+            if (outputs.columns) metadata.columns = outputs.columns;
+
+            await createArtifact({
+              caseId: case_id,
+              name: path.basename(filePath),
+              filePath,
+              mimeType: inferMimeType(filePath),
+              size: stat.size,
+              sourceType: 'skill_output',
+              sourceStepId: toolResultStepId,
+              metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+            });
+          } catch (err) {
+            console.error('Failed to create artifact:', err);
+          }
+        }
+      }
+    }
 
     const response: BridgeRunResponse = {
       job_id: result.executionId,

@@ -11,6 +11,7 @@ import { db, schema } from '../db/index.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { executeWorkflowSync } from '../services/sync-executor.js';
+import { createArtifact, buildArtifactContext, findArtifactByName, inferMimeType } from '../services/artifact-service.js';
 
 // Multer config for file uploads
 const storage = multer.diskStorage({
@@ -160,14 +161,22 @@ function parseToolCall(content: string): ToolCall | null {
 /**
  * Build tool context string for the agent, describing available tools and how to call them.
  */
-function buildToolContext(
+async function buildToolContext(
   scenarios: Array<{ toolName: string; name: string; shortDescription: string; inputsSchema: unknown }>,
   domainId: string,
   caseId: string,
-): string {
-  if (scenarios.length === 0) return '';
+): Promise<string> {
+  let ctx = '';
 
-  let ctx = '\n\n## Available Tools\n\n';
+  // Add artifact context (available case files)
+  const artifactCtx = await buildArtifactContext(caseId);
+  if (artifactCtx) {
+    ctx += '\n\n' + artifactCtx;
+  }
+
+  if (scenarios.length === 0) return ctx;
+
+  ctx += '\n\n## Available Tools\n\n';
   ctx += 'When you need to use a tool, respond with ONLY a JSON block like this:\n';
   ctx += '```json\n{"tool_call": {"tool_name": "<name>", "inputs": {<params>}}}\n```\n\n';
   ctx += 'Do NOT add any text before or after the JSON block when calling a tool.\n';
@@ -272,7 +281,7 @@ chatRouter.post('/send', async (req, res) => {
     });
 
     // Build message with tool context
-    const toolContext = buildToolContext(scenarios, domain.id, case_id);
+    const toolContext = await buildToolContext(scenarios, domain.id, case_id);
     const enrichedMessage = toolContext ? `${message}\n${toolContext}` : message;
 
     // Call agent
@@ -333,18 +342,30 @@ chatRouter.post('/send', async (req, res) => {
         createdAt: new Date(),
       });
 
+      // Resolve artifact names in inputs to actual file paths
+      const resolvedInputs = { ...toolCall.inputs };
+      for (const [key, value] of Object.entries(resolvedInputs)) {
+        if (typeof value === 'string' && value.length > 0 && !value.startsWith('/') && !value.startsWith('uploads/') && !value.startsWith('artifacts/')) {
+          const artifact = findArtifactByName(case_id, value);
+          if (artifact) {
+            resolvedInputs[key] = artifact.filePath;
+          }
+        }
+      }
+
       // Execute workflow via sync executor
       let toolResultMessage: string;
       try {
         const result = await executeWorkflowSync(
           scenario.workflowId,
           'manual',
-          { bridgeInputs: toolCall.inputs, caseId: case_id, scenarioId: scenario.id },
+          { bridgeInputs: resolvedInputs, caseId: case_id, scenarioId: scenario.id },
         );
 
         // Log tool_result step
+        const toolResultStepId = nanoid(16);
         await db.insert(schema.caseSteps).values({
-          id: nanoid(16),
+          id: toolResultStepId,
           caseId: case_id,
           stepIndex: stepIndex++,
           type: 'tool_result',
@@ -353,6 +374,33 @@ chatRouter.post('/send', async (req, res) => {
           scenarioId: scenario.id,
           createdAt: new Date(),
         });
+
+        // Detect file outputs and create artifacts
+        if (result.status === 'completed' && result.outputs) {
+          const filePath = result.outputs.filePath as string | undefined;
+          if (filePath && typeof filePath === 'string') {
+            const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+            if (fs.existsSync(absolutePath)) {
+              try {
+                const stat = fs.statSync(absolutePath);
+                const metadata: Record<string, unknown> = {};
+                if (result.outputs.rowCount != null) metadata.rowCount = result.outputs.rowCount;
+                await createArtifact({
+                  caseId: case_id,
+                  name: path.basename(filePath),
+                  filePath,
+                  mimeType: inferMimeType(filePath),
+                  size: stat.size,
+                  sourceType: 'skill_output',
+                  sourceStepId: toolResultStepId,
+                  metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+                });
+              } catch (err) {
+                console.error('Failed to create artifact from chat tool result:', err);
+              }
+            }
+          }
+        }
 
         if (result.status === 'completed') {
           toolResultMessage = `Tool "${toolCall.tool_name}" result:\n${JSON.stringify(result.outputs, null, 2)}\n\nNow format this result nicely for the user. Do NOT output a tool_call JSON.`;
@@ -471,14 +519,32 @@ chatRouter.post('/upload', upload.array('files', 10), async (req, res) => {
         path: `uploads/${case_id}/${f.filename}`,
       }));
 
+      const uploadStepId = nanoid(16);
       await db.insert(schema.caseSteps).values({
-        id: nanoid(16),
+        id: uploadStepId,
         caseId: case_id,
         stepIndex: stepIndex++,
         type: 'file_upload',
         content: JSON.stringify({ files: fileData }),
         createdAt: new Date(),
       });
+
+      // Create artifacts for uploaded files
+      for (const f of fileData) {
+        try {
+          await createArtifact({
+            caseId: case_id,
+            name: f.originalName,
+            filePath: f.path,
+            mimeType: f.mimeType,
+            size: f.size,
+            sourceType: 'upload',
+            sourceStepId: uploadStepId,
+          });
+        } catch (err) {
+          console.error('Failed to create artifact for upload:', err);
+        }
+      }
     }
 
     // If no message, return upload-only response
@@ -516,7 +582,7 @@ chatRouter.post('/upload', upload.array('files', 10), async (req, res) => {
     });
 
     // Build message with tool context
-    const toolContext = buildToolContext(scenarios, domain.id, case_id);
+    const toolContext = await buildToolContext(scenarios, domain.id, case_id);
     const enrichedMessage = toolContext ? `${message.trim()}\n${toolContext}` : message.trim();
 
     // Call agent
@@ -574,16 +640,28 @@ chatRouter.post('/upload', upload.array('files', 10), async (req, res) => {
         createdAt: new Date(),
       });
 
+      // Resolve artifact names in inputs to actual file paths
+      const resolvedInputs = { ...toolCall.inputs };
+      for (const [key, value] of Object.entries(resolvedInputs)) {
+        if (typeof value === 'string' && value.length > 0 && !value.startsWith('/') && !value.startsWith('uploads/') && !value.startsWith('artifacts/')) {
+          const artifact = findArtifactByName(case_id, value);
+          if (artifact) {
+            resolvedInputs[key] = artifact.filePath;
+          }
+        }
+      }
+
       let toolResultMessage: string;
       try {
         const result = await executeWorkflowSync(
           scenario.workflowId,
           'manual',
-          { bridgeInputs: toolCall.inputs, caseId: case_id, scenarioId: scenario.id },
+          { bridgeInputs: resolvedInputs, caseId: case_id, scenarioId: scenario.id },
         );
 
+        const toolResultStepId = nanoid(16);
         await db.insert(schema.caseSteps).values({
-          id: nanoid(16),
+          id: toolResultStepId,
           caseId: case_id,
           stepIndex: stepIndex++,
           type: 'tool_result',
@@ -592,6 +670,33 @@ chatRouter.post('/upload', upload.array('files', 10), async (req, res) => {
           scenarioId: scenario.id,
           createdAt: new Date(),
         });
+
+        // Detect file outputs and create artifacts
+        if (result.status === 'completed' && result.outputs) {
+          const filePath = result.outputs.filePath as string | undefined;
+          if (filePath && typeof filePath === 'string') {
+            const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+            if (fs.existsSync(absolutePath)) {
+              try {
+                const stat = fs.statSync(absolutePath);
+                const metadata: Record<string, unknown> = {};
+                if (result.outputs.rowCount != null) metadata.rowCount = result.outputs.rowCount;
+                await createArtifact({
+                  caseId: case_id,
+                  name: path.basename(filePath),
+                  filePath,
+                  mimeType: inferMimeType(filePath),
+                  size: stat.size,
+                  sourceType: 'skill_output',
+                  sourceStepId: toolResultStepId,
+                  metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+                });
+              } catch (err) {
+                console.error('Failed to create artifact from upload tool result:', err);
+              }
+            }
+          }
+        }
 
         if (result.status === 'completed') {
           toolResultMessage = `Tool "${toolCall.tool_name}" result:\n${JSON.stringify(result.outputs, null, 2)}\n\nNow format this result nicely for the user. Do NOT output a tool_call JSON.`;

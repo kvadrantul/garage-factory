@@ -17,7 +17,7 @@ function App() {
   return (
     <div className="h-screen bg-background text-foreground">
       <Routes>
-        <Route path="/" element={<Navigate to="/workflows" replace />} />
+        <Route path="/" element={<Navigate to="/domains" replace />} />
         {/* Sidebar layout */}
         <Route element={<AppLayout />}>
           <Route path="/workflows" element={<WorkflowList />} />

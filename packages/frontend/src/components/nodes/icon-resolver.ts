@@ -4,6 +4,7 @@
 import {
   // Files & Documents
   FileSpreadsheet,
+  FileDown,
   File,
   FileText,
   FileJson,
@@ -72,7 +73,10 @@ import {
   Webhook,
 
   // Actions
+  ArrowUpDown,
+  Columns,
   Download,
+  Group,
   Upload,
   Filter,
   Search,
@@ -200,6 +204,7 @@ import {
 const iconMap: Record<string, LucideIcon> = {
   // Files & Documents
   FileSpreadsheet,
+  FileDown,
   File,
   FileText,
   FileJson,
@@ -268,7 +273,10 @@ const iconMap: Record<string, LucideIcon> = {
   Webhook,
 
   // Actions
+  ArrowUpDown,
+  Columns,
   Download,
+  Group,
   Upload,
   Filter,
   Search,

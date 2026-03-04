@@ -13,7 +13,7 @@ import {
   UserCheck,
   Settings,
 } from 'lucide-react';
-import { customNodesApi } from '@/api/client';
+import { customNodesApi, nodesApi } from '@/api/client';
 import { resolveIcon } from '@/components/nodes/icon-resolver';
 
 interface NodeDefinition {
@@ -54,16 +54,25 @@ const categoryDisplayMap: Record<string, string> = {
   logic: 'Logic',
   ai: 'AI',
   utility: 'Utility',
+  extraction: 'Document',
+  transformation: 'Document',
+  generation: 'Document',
   custom: 'Custom',
 };
 
-const categories = ['Triggers', 'Actions', 'Logic', 'AI', 'Utility', 'Custom'];
+const categories = ['Triggers', 'Actions', 'Logic', 'AI', 'Utility', 'Document', 'Custom'];
 
 export function NodePalette() {
   const { data: customNodesData } = useQuery({
     queryKey: ['custom-nodes'],
     queryFn: () => customNodesApi.list(),
     staleTime: 30000,
+  });
+
+  const { data: catalogData } = useQuery({
+    queryKey: ['nodes-catalog'],
+    queryFn: () => nodesApi.catalog(),
+    staleTime: 60000,
   });
 
   const customNodes: NodeDefinition[] = (customNodesData?.data || [])
@@ -80,7 +89,19 @@ export function NodePalette() {
       };
     });
 
-  const allNodes = [...staticNodeDefinitions, ...customNodes];
+  const documentNodes: NodeDefinition[] = (catalogData?.data || []).map((n: any) => {
+    const IconComponent = resolveIcon(n.icon);
+    return {
+      type: n.id,
+      name: n.name,
+      icon: <IconComponent size={16} />,
+      category: 'Document',
+      customIcon: n.icon,
+      customColor: n.color,
+    };
+  });
+
+  const allNodes = [...staticNodeDefinitions, ...documentNodes, ...customNodes];
 
   const onDragStart = (event: React.DragEvent, node: NodeDefinition) => {
     event.dataTransfer.setData('application/reactflow', node.type);

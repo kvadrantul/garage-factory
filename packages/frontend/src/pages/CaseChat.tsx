@@ -6,6 +6,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Send, ArrowLeft, Loader2, Wrench, CheckCircle, XCircle, AlertTriangle, User, Bot, ThumbsUp, ThumbsDown, Paperclip, FileText, X, Download } from 'lucide-react';
 import { casesApi, chatApi, hitlApi } from '@/api/client';
 import { CasesSidebar } from '@/components/expert/CasesSidebar';
+import { ArtifactsPanel } from '@/components/expert/ArtifactsPanel';
 
 export function CaseChat() {
   const { id: caseId } = useParams<{ id: string }>();
@@ -38,6 +39,7 @@ export function CaseChat() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chat-history', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['case-artifacts', caseId] });
     },
     onSettled: () => {
       setPendingMessage(null);
@@ -56,6 +58,7 @@ export function CaseChat() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chat-history', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['case-artifacts', caseId] });
     },
     onSettled: () => {
       setPendingMessage(null);
@@ -264,6 +267,9 @@ export function CaseChat() {
           )}
         </div>
       </div>
+
+      {/* Artifacts Panel */}
+      {caseId && <ArtifactsPanel caseId={caseId} />}
     </div>
   );
 }

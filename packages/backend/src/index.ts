@@ -14,11 +14,15 @@ import { customNodesRouter } from './api/custom-nodes.js';
 import { bridgeRouter } from './api/bridge.js';
 import { chatRouter } from './api/chat.js';
 import { expertRouter } from './api/expert.js';
+import { artifactsRouter } from './api/artifacts.js';
+import { nodesRouter } from './api/nodes.js';
+import { skillsRouter } from './api/skills.js';
 import { webhookRouter } from './webhooks/webhook-handler.js';
 import { initExecutionService } from './services/execution-service.js';
 import { executionEventBus } from './services/sync-executor.js';
 import { initScheduler } from './services/scheduler.js';
 import { loadCustomNodes } from './nodes/custom/custom-node-loader.js';
+import { loadDocumentNodes } from './nodes/document/loader.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -79,12 +83,18 @@ app.use('/api/custom-nodes', customNodesRouter);
 app.use('/api/bridge', bridgeRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/expert', expertRouter);
+app.use('/api/artifacts', artifactsRouter);
+app.use('/api/nodes', nodesRouter);
+app.use('/api/skills', skillsRouter);
 
 // Webhook Handler
 app.use('/webhooks', webhookRouter);
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// Serve artifact files
+app.use('/artifacts', express.static(path.join(process.cwd(), 'artifacts')));
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -132,6 +142,9 @@ wss.on('connection', (ws) => {
 
 // Initialize database and start server
 initializeDatabase();
+
+// Load document nodes (must be before custom nodes to prevent conflicts)
+loadDocumentNodes();
 
 // Load custom nodes from manifests + DB
 loadCustomNodes();

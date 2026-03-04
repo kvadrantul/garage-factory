@@ -224,7 +224,12 @@ export function HITLList() {
   return (
     <main className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-foreground">Human-in-the-Loop Requests</h2>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">HITL Requests</h1>
+          <p className="text-muted-foreground mt-1">
+            Review and respond to human-in-the-loop approval requests
+          </p>
+        </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}

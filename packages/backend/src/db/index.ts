@@ -165,6 +165,20 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
     CREATE INDEX IF NOT EXISTS idx_case_steps_case_id ON case_steps(case_id);
     CREATE INDEX IF NOT EXISTS idx_case_steps_execution_id ON case_steps(execution_id);
+
+    CREATE TABLE IF NOT EXISTS case_artifacts (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size INTEGER NOT NULL DEFAULT 0,
+      source_type TEXT NOT NULL,
+      source_step_id TEXT REFERENCES case_steps(id),
+      metadata TEXT,
+      created_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_case_artifacts_case_id ON case_artifacts(case_id);
   `);
 
   console.log('Database initialized');

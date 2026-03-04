@@ -127,6 +127,12 @@ export const credentialsApi = {
     }),
 };
 
+// Document Nodes API (catalog)
+export const nodesApi = {
+  catalog: () =>
+    request<{ data: any[] }>('/nodes/catalog'),
+};
+
 // Custom Nodes API
 export const customNodesApi = {
   list: () =>
@@ -290,4 +296,43 @@ export const chatApi = {
 
   history: (caseId: string) =>
     request<{ case_id: string; steps: any[] }>(`/chat/history/${caseId}`),
+};
+
+// Artifacts API
+export const artifactsApi = {
+  list: (caseId: string) =>
+    request<{ data: any[] }>(`/artifacts?case_id=${caseId}`),
+
+  delete: (id: string) =>
+    request<void>(`/artifacts/${id}`, { method: 'DELETE' }),
+};
+
+// Skills API (Phase B: Skill Generation)
+export const skillsApi = {
+  generate: (data: FormData) =>
+    requestFormData<{ data: any }>('/skills/generate', data),
+
+  save: (data: {
+    domainId: string;
+    workflowDefinition: any;
+    scenario: {
+      toolName: string;
+      name: string;
+      shortDescription: string;
+      whenToApply: string;
+      inputsSchema?: Record<string, unknown>;
+      riskClass?: string;
+      estimatedDuration?: string;
+    };
+  }) =>
+    request<{ data: { workflow: any; scenario: any } }>('/skills/save', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  test: (workflowId: string, sampleFilePath?: string) =>
+    request<{ data: { status: string; rowsProcessed?: number; outputSummary: string; error?: string } }>('/skills/test', {
+      method: 'POST',
+      body: JSON.stringify({ workflowId, sampleFilePath }),
+    }),
 };

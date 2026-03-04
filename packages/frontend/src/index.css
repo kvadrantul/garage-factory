@@ -13,8 +13,8 @@
   --card-foreground: 240 10% 3.9%;
   --popover: 0 0% 100%;
   --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
+  --primary: 25 95% 53%;
+  --primary-foreground: 0 0% 100%;
   --secondary: 240 4.8% 95.9%;
   --secondary-foreground: 240 5.9% 10%;
   --muted: 240 4.8% 95.9%;
@@ -25,17 +25,17 @@
   --destructive-foreground: 0 0% 98%;
   --border: 240 5.9% 90%;
   --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
+  --ring: 25 95% 53%;
   --radius: 0.75rem;
 
   --sidebar: 0 0% 98%;
   --sidebar-foreground: 240 5.3% 26.1%;
-  --sidebar-primary: 240 5.9% 10%;
-  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-primary: 25 95% 53%;
+  --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 240 4.8% 95.9%;
   --sidebar-accent-foreground: 240 5.9% 10%;
   --sidebar-border: 220 13% 91%;
-  --sidebar-ring: 217.2 91.2% 59.8%;
+  --sidebar-ring: 25 95% 53%;
 }
 
 .dark {
@@ -45,8 +45,8 @@
   --card-foreground: 210 2% 88%;
   --popover: 240 3% 10%;
   --popover-foreground: 210 2% 88%;
-  --primary: 217 89% 82%;
-  --primary-foreground: 240 3% 6%;
+  --primary: 25 95% 63%;
+  --primary-foreground: 0 0% 100%;
   --secondary: 240 4% 16%;
   --secondary-foreground: 210 2% 88%;
   --muted: 240 4% 16%;
@@ -57,16 +57,16 @@
   --destructive-foreground: 210 2% 88%;
   --border: 240 4% 20%;
   --input: 240 4% 20%;
-  --ring: 217 89% 82%;
+  --ring: 25 95% 63%;
 
   --sidebar: 240 3% 8%;
   --sidebar-foreground: 240 2% 75%;
-  --sidebar-primary: 217 89% 82%;
-  --sidebar-primary-foreground: 240 3% 6%;
+  --sidebar-primary: 25 95% 63%;
+  --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 240 4% 16%;
   --sidebar-accent-foreground: 210 2% 88%;
   --sidebar-border: 240 4% 16%;
-  --sidebar-ring: 217 89% 82%;
+  --sidebar-ring: 25 95% 63%;
 }
 
 @layer base {
@@ -96,7 +96,7 @@
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #3b82f6;
+  stroke: hsl(25 95% 53%);
 }
 
 /* Dark mode React Flow overrides */

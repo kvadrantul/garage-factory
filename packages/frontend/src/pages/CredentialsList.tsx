@@ -58,7 +58,12 @@ export function CredentialsList() {
   return (
     <main className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Credentials</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Credentials</h1>
+          <p className="text-muted-foreground mt-1">
+            Store and manage API keys, tokens, and authentication secrets
+          </p>
+        </div>
         <button
           onClick={handleCreate}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
@@ -82,37 +87,31 @@ export function CredentialsList() {
             </button>
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {data?.data.map((credential: Credential) => (
               <div
                 key={credential.id}
-                className="bg-card rounded-lg border border-border p-4 hover:shadow-md transition-shadow"
+                className="bg-card rounded-lg border border-border p-5 hover:shadow-md transition-shadow"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
                     {getTypeIcon(credential.type)}
                     <div>
-                      <h3 className="text-lg font-medium text-card-foreground">
+                      <h3 className="font-medium text-card-foreground">
                         {credential.name}
                       </h3>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                        <span className="px-2 py-0.5 rounded bg-muted">
-                          {CREDENTIAL_TYPES.find(t => t.value === credential.type)?.label || credential.type}
-                        </span>
-                        <span>
-                          Updated: {new Date(credential.updatedAt).toLocaleDateString()}
-                        </span>
-                      </div>
+                      <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                        {CREDENTIAL_TYPES.find(t => t.value === credential.type)?.label || credential.type}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => handleEdit(credential)}
-                      className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                      className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
                       title="Edit"
                     >
-                      <Edit2 size={18} />
+                      <Edit2 size={16} />
                     </button>
                     <button
                       onClick={() => {
@@ -120,12 +119,17 @@ export function CredentialsList() {
                           deleteMutation.mutate(credential.id);
                         }
                       }}
-                      className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                       title="Delete"
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
+                </div>
+                <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border text-xs text-muted-foreground">
+                  <span>
+                    Updated: {new Date(credential.updatedAt).toLocaleDateString()}
+                  </span>
                 </div>
               </div>
             ))}

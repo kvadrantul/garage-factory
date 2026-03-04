@@ -279,6 +279,51 @@ export interface PropertyDefinition {
 }
 
 // ============================================
+// DOCUMENT NODE TYPES
+// ============================================
+
+export type DocumentNodeCategory = 'extraction' | 'transformation' | 'analysis' | 'generation';
+
+export interface DataContract {
+  inputShape: 'rows' | 'any' | 'file-path' | 'scalar';
+  outputShape: 'rows' | 'file-path' | 'scalar' | 'report';
+  outputFields?: string[];
+}
+
+export interface DocumentNodeManifest {
+  id: string;
+  name: string;
+  category: DocumentNodeCategory;
+  description: string;
+  version: string;
+  icon: string;
+  color: string;
+  inputs: PortDefinition[];
+  outputs: PortDefinition[];
+  properties: PropertyDefinition[];
+  dataContract: DataContract;
+}
+
+// ============================================
+// CASE ARTIFACT TYPES
+// ============================================
+
+export type ArtifactSourceType = 'upload' | 'skill_output' | 'generated';
+
+export interface CaseArtifact {
+  id: string;
+  caseId: string;
+  name: string;
+  filePath: string;
+  mimeType: string;
+  size: number;
+  sourceType: ArtifactSourceType;
+  sourceStepId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+}
+
+// ============================================
 // CUSTOM NODE TYPES
 // ============================================
 
@@ -408,4 +453,42 @@ export interface SyncExecuteResult {
   error?: string;
   hitlRequestId?: string;
   durationMs: number;
+}
+
+// ============================================
+// SKILL GENERATION TYPES (Phase B)
+// ============================================
+
+export interface SkillGenerationResult {
+  workflowDefinition: WorkflowDefinition;
+  scenario: {
+    toolName: string;
+    name: string;
+    shortDescription: string;
+    whenToApply: string;
+    inputsSchema: Record<string, unknown>;
+  };
+  generationLog: string;
+  sampleFileTempPath?: string;
+}
+
+export interface SkillSaveRequest {
+  domainId: string;
+  workflowDefinition: WorkflowDefinition;
+  scenario: {
+    toolName: string;
+    name: string;
+    shortDescription: string;
+    whenToApply: string;
+    inputsSchema?: Record<string, unknown>;
+    riskClass?: string;
+    estimatedDuration?: string;
+  };
+}
+
+export interface SkillTestResult {
+  status: 'completed' | 'failed' | 'skipped';
+  rowsProcessed?: number;
+  outputSummary: string;
+  error?: string;
 }
