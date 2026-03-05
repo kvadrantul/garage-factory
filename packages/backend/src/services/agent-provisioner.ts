@@ -142,6 +142,101 @@ export async function updateAgentIdentity(
 }
 
 /**
+ * Build IDENTITY.md content for builder (workflow architect) agent
+ */
+function buildBuilderIdentity(domain: DomainInfo): string {
+  const icon = domain.icon ?? '';
+  const desc = domain.description ?? domain.name;
+
+  let identity = `# ${icon} ${domain.name} — Workflow Architect\n\n`;
+  identity += `You are a workflow architect for the "${domain.name}" domain.\n`;
+  identity += `Domain context: ${desc}\n\n`;
+  identity += `## Your Role\n\n`;
+  identity += `You design and generate automation workflows using the available node types. `;
+  identity += `When the user describes a task, you produce a valid workflow definition in JSON.\n\n`;
+  identity += `## Available Node Types\n\n`;
+  identity += `**Document processing:** read-excel, filter-rows, group-by, sort-rows, select-columns, format-output, write-excel\n`;
+  identity += `**Core:** http-request, code, set, if, switch, merge\n\n`;
+  identity += `## Rules\n\n`;
+  identity += `- Return ONLY valid JSON — no markdown fences, no prose outside the JSON.\n`;
+  identity += `- For document workflows: start with read-excel, end with write-excel.\n`;
+  identity += `- Use expressions like \`{{ $input.bridgeInputs.PARAM_NAME }}\` for user inputs.\n`;
+  identity += `- Use \`{{ $node["NodeName"].FIELD_NAME }}\` for upstream node outputs.\n`;
+  identity += `- Include inputsSchema with all runtime parameters as JSON Schema (type: "object").\n`;
+  identity += `- Respond in the user's language.\n`;
+
+  return identity;
+}
+
+/**
+ * Provision a new OpenClaw builder agent for a domain.
+ */
+export async function provisionBuilderAgent(
+  domain: DomainInfo,
+  model?: string,
+): Promise<ProvisionResult> {
+  const agentName = `builder-${domain.slug}`;
+  const workspace = join(homedir(), '.openclaw', `workspace-${agentName}`);
+  const resolvedModel = model ?? 'openrouter/deepseek/deepseek-chat-v3.1';
+
+  const result = await runCommand('openclaw', [
+    'agents', 'add', `${domain.name} Builder`,
+    '--workspace', workspace,
+    '--non-interactive',
+    '--model', resolvedModel,
+    '--json',
+  ]);
+
+  if (result.code !== 0) {
+    throw new Error(`Failed to provision builder agent: ${result.stderr || result.stdout}`);
+  }
+
+  let agentId: string;
+  let resolvedWorkspace: string;
+
+  try {
+    const jsonMatch = result.stdout.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in output');
+    const output = JSON.parse(jsonMatch[0]);
+    agentId = output.id || output.agentId;
+    resolvedWorkspace = output.workspace || output.workspaceDir || workspace;
+  } catch {
+    const listResult = await runCommand('openclaw', ['agents', 'list', '--json']);
+    const agents = JSON.parse(listResult.stdout);
+    const found = agents.find((a: { name: string }) => a.name === `${domain.name} Builder`);
+    if (!found) throw new Error('Builder agent created but could not find it in agent list');
+    agentId = found.id;
+    resolvedWorkspace = found.workspace || workspace;
+  }
+
+  const identity = buildBuilderIdentity(domain);
+  await writeFile(join(resolvedWorkspace, 'IDENTITY.md'), identity, 'utf-8');
+
+  console.log(`[agent-provisioner] Provisioned builder agent "${agentId}" for domain "${domain.slug}"`);
+
+  return { agentId, workspace: resolvedWorkspace };
+}
+
+/**
+ * Update IDENTITY.md for an existing builder agent when domain metadata changes.
+ */
+export async function updateBuilderAgentIdentity(
+  agentId: string,
+  domain: DomainInfo,
+): Promise<void> {
+  const workspace = await getAgentWorkspace(agentId);
+  if (!workspace) {
+    console.warn(`[agent-provisioner] Workspace not found for builder agent "${agentId}", skipping identity update`);
+    return;
+  }
+
+  const identity = buildBuilderIdentity(domain);
+  await writeFile(join(workspace, 'IDENTITY.md'), identity, 'utf-8');
+
+  console.log(`[agent-provisioner] Updated builder identity for agent "${agentId}"`);
+}
+
+/**
  * Delete an OpenClaw agent and its workspace.
  */
 export async function deleteAgent(agentId: string): Promise<void> {

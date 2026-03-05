@@ -1,10 +1,9 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Moon, Sun, GitBranch, Play, KeyRound, ShieldCheck, Blocks, Building2 } from 'lucide-react';
+import { Moon, Sun, Play, KeyRound, ShieldCheck, Blocks, Building2 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 
 const NAV_ITEMS = [
   { to: '/domains', label: 'Offices', icon: Building2 },
-  { to: '/workflows', label: 'Workflows', icon: GitBranch },
   { to: '/custom-nodes', label: 'Custom Nodes', icon: Blocks },
   { to: '/credentials', label: 'Credentials', icon: KeyRound },
   { to: '/executions', label: 'Executions', icon: Play },

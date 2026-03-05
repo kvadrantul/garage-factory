@@ -29,6 +29,7 @@ export function initializeDatabase() {
       description TEXT,
       definition TEXT NOT NULL,
       settings TEXT,
+      domain_id TEXT,
       active INTEGER DEFAULT 0,
       created_at INTEGER,
       updated_at INTEGER
@@ -114,6 +115,7 @@ export function initializeDatabase() {
       description TEXT,
       icon TEXT,
       agent_id TEXT,
+      builder_agent_id TEXT,
       system_prompt TEXT,
       created_at INTEGER,
       updated_at INTEGER
@@ -179,6 +181,17 @@ export function initializeDatabase() {
       created_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_case_artifacts_case_id ON case_artifacts(case_id);
+  `);
+
+  // Migration guards for new columns (idempotent — SQLite throws if column already exists)
+  try { sqlite.exec('ALTER TABLE domains ADD COLUMN builder_agent_id TEXT'); } catch {}
+  try { sqlite.exec('ALTER TABLE workflows ADD COLUMN domain_id TEXT'); } catch {}
+
+  // Backfill workflows.domain_id from scenarios (no-op after first run)
+  sqlite.exec(`
+    UPDATE workflows SET domain_id = (
+      SELECT domain_id FROM scenarios WHERE scenarios.workflow_id = workflows.id LIMIT 1
+    ) WHERE domain_id IS NULL
   `);
 
   console.log('Database initialized');

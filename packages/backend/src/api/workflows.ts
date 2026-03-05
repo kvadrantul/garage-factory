@@ -15,17 +15,26 @@ workflowsRouter.get('/', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
+    const domainId = req.query.domain_id as string | undefined;
 
-    const results = await db
+    let query = db
       .select()
       .from(schema.workflows)
       .orderBy(desc(schema.workflows.updatedAt))
       .limit(limit)
       .offset(offset);
 
-    const total = await db
-      .select()
-      .from(schema.workflows);
+    if (domainId) {
+      query = query.where(eq(schema.workflows.domainId, domainId)) as typeof query;
+    }
+
+    const results = await query;
+
+    let totalQuery = db.select().from(schema.workflows);
+    if (domainId) {
+      totalQuery = totalQuery.where(eq(schema.workflows.domainId, domainId)) as typeof totalQuery;
+    }
+    const total = await totalQuery;
 
     res.json({
       data: results,
@@ -64,11 +73,12 @@ workflowsRouter.get('/:id', async (req, res) => {
 // Create workflow
 workflowsRouter.post('/', async (req, res) => {
   try {
-    const { name, description, definition, settings } = req.body as {
+    const { name, description, definition, settings, domainId } = req.body as {
       name: string;
       description?: string;
       definition: WorkflowDefinition;
       settings?: WorkflowSettings;
+      domainId?: string;
     };
 
     if (!name || !definition) {
@@ -85,6 +95,7 @@ workflowsRouter.post('/', async (req, res) => {
         description,
         definition,
         settings,
+        domainId,
         createdAt: now,
         updatedAt: now,
       })

@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Edit2, Workflow, ToggleLeft, ToggleRight, Sparkles } from 'lucide-react';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { Plus, Trash2, Edit2, Workflow, ToggleLeft, ToggleRight, Sparkles, ArrowLeft } from 'lucide-react';
 import { scenariosApi, domainsApi, workflowsApi } from '@/api/client';
 
 const RISK_CLASSES = [
@@ -73,10 +73,21 @@ export function ScenarioList() {
 
   return (
     <main className="p-6">
+      {domainId && (
+        <div className="mb-4">
+          <Link
+            to="/domains"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft size={14} />
+            Offices
+          </Link>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            Scenarios {currentDomain && `- ${currentDomain.name}`}
+            Tools {currentDomain && `- ${currentDomain.name}`}
           </h1>
           <p className="text-muted-foreground mt-1">
             Workflow-backed tools available to expert agents
@@ -84,7 +95,13 @@ export function ScenarioList() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate('/workflows/new?generate=true')}
+            onClick={() => {
+              if (domainId) {
+                navigate(`/domains/${domainId}/workflows/new?generate=true`);
+              } else {
+                navigate('/domains');
+              }
+            }}
             className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
           >
             <Sparkles size={20} />
@@ -95,7 +112,7 @@ export function ScenarioList() {
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
           >
             <Plus size={20} />
-            New Scenario
+            New Tool
           </button>
         </div>
       </div>
@@ -105,12 +122,12 @@ export function ScenarioList() {
         ) : data?.data.length === 0 ? (
           <div className="text-center py-12">
             <Workflow size={48} className="mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground mb-4">No scenarios yet</p>
+            <p className="text-muted-foreground mb-4">No tools yet</p>
             <button
               onClick={() => setShowCreateModal(true)}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
             >
-              Create your first scenario
+              Create your first tool
             </button>
           </div>
         ) : (
@@ -142,7 +159,7 @@ export function ScenarioList() {
                         {scenario.shortDescription}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <span>Domain: {scenario.domainName}</span>
+                        <span>Office: {scenario.domainName}</span>
                         <span>Workflow: {scenario.workflowName}</span>
                         <span>Duration: {DURATIONS.find((d) => d.value === scenario.estimatedDuration)?.label}</span>
                       </div>
@@ -168,7 +185,7 @@ export function ScenarioList() {
                       </button>
                       <button
                         onClick={() => {
-                          if (confirm('Delete this scenario?')) {
+                          if (confirm('Delete this tool?')) {
                             deleteMutation.mutate(scenario.id);
                           }
                         }}
@@ -249,12 +266,12 @@ function ScenarioModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg border border-border p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-semibold mb-4">
-          {scenario ? 'Edit Scenario' : 'Create Scenario'}
+          {scenario ? 'Edit Tool' : 'Create Tool'}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Domain *</label>
+              <label className="block text-sm font-medium mb-1">Office *</label>
               <select
                 value={formData.domainId}
                 onChange={(e) => setFormData({ ...formData, domainId: e.target.value })}

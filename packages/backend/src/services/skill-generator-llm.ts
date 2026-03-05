@@ -177,7 +177,7 @@ function callOpenClawForGeneration(
   return new Promise((resolve) => {
     const combinedMessage = `${systemPrompt}\n\n---\n\n${userMessage}`;
     const sessionId = `skill-gen-${Date.now()}`;
-    const args = ['agent', '--agent', agentId, '--session-id', sessionId, '-m', combinedMessage, '--json', '--timeout', '180'];
+    const args = ['agent', '--agent', agentId, '--session-id', sessionId, '-m', combinedMessage, '--json', '--timeout', '300'];
 
     console.log(`[skill-gen] Combined message: ${combinedMessage.length} chars`);
 
@@ -213,11 +213,11 @@ function callOpenClawForGeneration(
       }
     });
 
-    // 3 minute timeout
+    // 5 minute timeout (matches --timeout 300 passed to CLI)
     setTimeout(() => {
       proc.kill();
-      resolve({ content: '', error: 'Generation timed out (180s)' });
-    }, 180_000);
+      resolve({ content: '', error: 'Generation timed out (300s)' });
+    }, 300_000);
   });
 }
 
@@ -418,14 +418,15 @@ export async function generateWorkflowFromDescription(
   const systemPrompt = buildSystemPrompt(catalog);
   const userMessage = buildUserMessage(description, sampleData);
 
+  const MAX_ATTEMPTS = 3;
   let lastError = '';
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const msg = attempt === 0
       ? userMessage
       : `${userMessage}\n\nCORRECTION NEEDED: ${lastError}\nReturn ONLY valid JSON, no other text.`;
 
-    console.log(`[skill-gen] Attempt ${attempt + 1}: calling OpenClaw CLI for agent ${agentId}`);
+    console.log(`[skill-gen] Attempt ${attempt + 1}/${MAX_ATTEMPTS}: calling OpenClaw CLI for agent ${agentId}`);
     console.log(`[skill-gen] Message length: ${msg.length} chars`);
 
     const result = await callOpenClawForGeneration(agentId, systemPrompt, msg);
@@ -436,8 +437,17 @@ export async function generateWorkflowFromDescription(
       console.warn(`[skill-gen] OpenClaw stderr: ${result.error.slice(0, 500)}`);
     }
 
+    // Retry on empty responses ("No reply from agent", timeouts, etc.)
     if (result.error && !result.content) {
-      throw new Error(`OpenClaw CLI error: ${result.error}`);
+      lastError = result.error;
+      console.warn(`[skill-gen] Attempt ${attempt + 1} got empty response: ${lastError}`);
+      if (attempt < MAX_ATTEMPTS - 1) {
+        const delayMs = (attempt + 1) * 3000;
+        console.log(`[skill-gen] Retrying in ${delayMs}ms...`);
+        await new Promise((r) => setTimeout(r, delayMs));
+        continue;
+      }
+      throw new Error(`OpenClaw CLI error after ${MAX_ATTEMPTS} attempts: ${lastError}`);
     }
 
     let draft: Record<string, unknown>;
@@ -446,8 +456,8 @@ export async function generateWorkflowFromDescription(
     } catch (parseErr) {
       lastError = `Failed to parse JSON: ${(parseErr as Error).message}`;
       console.warn(`[skill-gen] Attempt ${attempt + 1} parse failed:`, lastError);
-      if (attempt === 1) {
-        throw new Error(`Skill generation failed after 2 attempts. Last error: ${lastError}`);
+      if (attempt >= MAX_ATTEMPTS - 1) {
+        throw new Error(`Skill generation failed after ${MAX_ATTEMPTS} attempts. Last error: ${lastError}`);
       }
       continue;
     }
@@ -456,8 +466,8 @@ export async function generateWorkflowFromDescription(
     if (!validation.valid) {
       lastError = validation.errors.join('. ');
       console.warn(`[skill-gen] Attempt ${attempt + 1} validation failed:`, lastError);
-      if (attempt === 1) {
-        throw new Error(`Skill generation failed after 2 attempts. Validation errors: ${lastError}`);
+      if (attempt >= MAX_ATTEMPTS - 1) {
+        throw new Error(`Skill generation failed after ${MAX_ATTEMPTS} attempts. Validation errors: ${lastError}`);
       }
       continue;
     }

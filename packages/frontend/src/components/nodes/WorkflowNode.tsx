@@ -12,6 +12,13 @@ import {
   UserCheck,
   Settings,
   X,
+  FileSpreadsheet,
+  Filter,
+  Group,
+  ArrowUpDown,
+  Columns,
+  FileText,
+  FileDown,
   type LucideIcon,
 } from 'lucide-react';
 import { resolveIcon } from '@/components/nodes/icon-resolver';
@@ -28,6 +35,14 @@ const iconMap: Record<string, LucideIcon> = {
   'set': Settings,
   'agent': Bot,
   'hitl': UserCheck,
+  // Document processing nodes
+  'read-excel': FileSpreadsheet,
+  'filter-rows': Filter,
+  'group-by': Group,
+  'sort-rows': ArrowUpDown,
+  'select-columns': Columns,
+  'format-output': FileText,
+  'write-excel': FileDown,
 };
 
 const categoryColors: Record<string, { bg: string; border: string; icon: string }> = {
@@ -42,6 +57,14 @@ const categoryColors: Record<string, { bg: string; border: string; icon: string 
   'set': { bg: 'bg-muted', border: 'border-border', icon: 'text-muted-foreground' },
   'agent': { bg: 'bg-green-50 dark:bg-green-950/40', border: 'border-green-300 dark:border-green-700', icon: 'text-green-600 dark:text-green-400' },
   'hitl': { bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-300 dark:border-amber-700', icon: 'text-amber-600 dark:text-amber-400' },
+  // Document processing nodes
+  'read-excel': { bg: 'bg-green-50 dark:bg-green-950/40', border: 'border-green-300 dark:border-green-700', icon: 'text-green-600 dark:text-green-400' },
+  'filter-rows': { bg: 'bg-cyan-50 dark:bg-cyan-950/40', border: 'border-cyan-300 dark:border-cyan-700', icon: 'text-cyan-600 dark:text-cyan-400' },
+  'group-by': { bg: 'bg-cyan-50 dark:bg-cyan-950/40', border: 'border-cyan-300 dark:border-cyan-700', icon: 'text-cyan-600 dark:text-cyan-400' },
+  'sort-rows': { bg: 'bg-cyan-50 dark:bg-cyan-950/40', border: 'border-cyan-300 dark:border-cyan-700', icon: 'text-cyan-600 dark:text-cyan-400' },
+  'select-columns': { bg: 'bg-cyan-50 dark:bg-cyan-950/40', border: 'border-cyan-300 dark:border-cyan-700', icon: 'text-cyan-600 dark:text-cyan-400' },
+  'format-output': { bg: 'bg-teal-50 dark:bg-teal-950/40', border: 'border-teal-300 dark:border-teal-700', icon: 'text-teal-600 dark:text-teal-400' },
+  'write-excel': { bg: 'bg-green-50 dark:bg-green-950/40', border: 'border-green-300 dark:border-green-700', icon: 'text-green-600 dark:text-green-400' },
 };
 
 // Color presets for custom nodes (mapped from manifest "color" field)

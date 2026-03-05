@@ -45,13 +45,14 @@ const NODE_COLORS: Record<string, string> = {
 interface SkillGenerationPanelProps {
   onClose: () => void;
   onWorkflowGenerated: (nodes: Node[], edges: Edge[], workflowName: string) => void;
+  domainId?: string;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function SkillGenerationPanel({ onClose, onWorkflowGenerated }: SkillGenerationPanelProps) {
+export function SkillGenerationPanel({ onClose, onWorkflowGenerated, domainId }: SkillGenerationPanelProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [steps, setSteps] = useState<any[]>([]);
   const [message, setMessage] = useState('');
@@ -65,7 +66,7 @@ export function SkillGenerationPanel({ onClose, onWorkflowGenerated }: SkillGene
 
   // Start session on mount
   const startMutation = useMutation({
-    mutationFn: () => skillsChatApi.start(),
+    mutationFn: () => skillsChatApi.start(domainId),
     onSuccess: (data) => {
       setSessionId(data.sessionId);
       setSteps(data.steps);

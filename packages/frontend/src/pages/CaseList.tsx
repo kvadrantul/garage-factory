@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, Trash2, MessageSquare, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, CheckCircle, XCircle, Clock, ArrowLeft } from 'lucide-react';
 import { casesApi, domainsApi } from '@/api/client';
 
 const STATUS_CONFIG = {
@@ -46,6 +46,17 @@ export function CaseList() {
 
   return (
     <main className="p-6">
+      {domainId && (
+        <div className="mb-4">
+          <Link
+            to="/domains"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft size={14} />
+            Offices
+          </Link>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
@@ -122,7 +133,7 @@ export function CaseList() {
                         </span>
                       </div>
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <span>Domain: {caseItem.domainName}</span>
+                        <span>Office: {caseItem.domainName}</span>
                         <span>Created: {new Date(caseItem.createdAt).toLocaleDateString()}</span>
                         {caseItem.updatedAt !== caseItem.createdAt && (
                           <span>Updated: {new Date(caseItem.updatedAt).toLocaleDateString()}</span>
@@ -207,7 +218,7 @@ function CreateCaseModal({
         <h2 className="text-lg font-semibold mb-4">Start New Case</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Domain *</label>
+            <label className="block text-sm font-medium mb-1">Office *</label>
             <select
               value={formData.domainId}
               onChange={(e) => setFormData({ ...formData, domainId: e.target.value })}

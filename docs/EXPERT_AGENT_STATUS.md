@@ -204,6 +204,62 @@ Session ID is:
 - Finds parent case via executionId -> caseSteps join
 - Step content includes: status, action, data, reason, hitlRequestId
 
+### 19. Skills Chat API (Chat-based Skill Generation)
+**File:** `packages/backend/src/api/skills-chat.ts`
+
+```
+POST   /api/skills/chat/start           - Create ephemeral session, resolve agent
+POST   /api/skills/chat/send            - Send description, receive generated workflow
+GET    /api/skills/chat/history/:id     - Get session history
+```
+
+**How it works:**
+1. POST /start resolves agent: `SKILL_GEN_AGENT_ID` env var → first domain with agentId → error
+2. Creates ephemeral in-memory session (2-hour TTL, cleanup every 10 min)
+3. POST /send calls `generateWorkflowFromDescription()` with user description
+4. Returns `skill_generated` step with `workflowDefinition`, `scenario`, and `generationLog`
+5. On failure, returns `assistant_message` step with error text
+6. Supports optional sample Excel file upload via multipart form
+
+### 20. LLM Skill Generation with Core Nodes
+**File:** `packages/backend/src/services/skill-generator-llm.ts`
+
+Generates workflow definitions from natural language descriptions via OpenClaw CLI.
+
+**Node catalog:**
+- Document nodes (7): read-excel, filter-rows, group-by, sort-rows, select-columns, format-output, write-excel
+- Core nodes (6): http-request, code, set, if, switch, merge
+
+**OpenClaw CLI integration:**
+- System prompt embedded in `-m` message body (CLI has no `--system` flag)
+- Each call uses unique `--session-id` to avoid context mixing
+- Response parsed from `result.payloads[0].text` (OpenClaw `--json` format)
+- JSON extraction handles markdown fences, prose wrapping, and nested structures
+- 2-attempt retry loop with validation feedback on failure
+- 180-second timeout, `--timeout 180` passed to CLI
+
+**Validation:** node types checked against catalog, toolName format, required fields, inputsSchema structure.
+
+### 21. Skill Generation Panel
+**File:** `packages/frontend/src/components/panels/SkillGenerationPanel.tsx`
+
+Right-side panel (w-96) in WorkflowEditor for chat-based workflow generation.
+
+**Props:** `onClose()`, `onWorkflowGenerated(nodes, edges, workflowName)`
+
+**Integration with WorkflowEditor:**
+- Sparkles toolbar button toggles panel
+- Mutually exclusive with NDVPanel and ExecutionHistorySidebar
+- Auto-opens when navigating to `/workflows/new?generate=true`
+- "Generate Skill" buttons in WorkflowList and ScenarioList navigate to this route
+- On generation success: nodes/edges loaded onto canvas, workflow name set, dirty flag enabled
+
+**UI:**
+- Chat-style interface with welcome message, user messages, error messages
+- Compact generation card showing pipeline visualization (node chain with arrows)
+- File attachment support for sample Excel files
+- Loading spinner during generation
+
 ---
 
 ## NOT YET IMPLEMENTED
@@ -345,6 +401,19 @@ Tested with Bank Statement Analyst domain:
 7. Result fed back to agent, agent formatted human-readable response
 8. All steps visible in chat UI (user message, tool call card, tool result card, agent response)
 
+### Skill Generation Panel E2E
+
+Tested with general automation task:
+1. Opened WorkflowEditor via "Generate Skill" button (or `/workflows/new?generate=true`)
+2. SkillGenerationPanel opened as right-side panel
+3. Sent description: "Create an automation that first calls google.com then ya.ru"
+4. Backend created ephemeral chat session, resolved agent from `SKILL_GEN_AGENT_ID` env var
+5. `skill-generator-llm.ts` built catalog (7 document nodes + 6 core nodes), embedded system prompt in message
+6. OpenClaw CLI returned valid JSON with 2 `http-request` nodes
+7. Response parsed from `result.payloads[0].text`, validated against catalog
+8. Workflow loaded onto canvas: `manual-trigger → http-request (Fetch Google) → http-request (Fetch Yandex)`
+9. Generation took ~15 seconds, 1 attempt
+
 ---
 
 ## File Structure
@@ -353,6 +422,7 @@ Tested with Bank Statement Analyst domain:
 ```
 packages/backend/src/services/sync-executor.ts      - Synchronous workflow execution
 packages/backend/src/services/skill-generator.ts     - Generate OpenClaw SKILL.md files
+packages/backend/src/services/skill-generator-llm.ts - LLM-based workflow generation from descriptions
 packages/backend/src/services/agent-provisioner.ts   - Create/update/delete OpenClaw agents
 ```
 
@@ -361,6 +431,8 @@ packages/backend/src/services/agent-provisioner.ts   - Create/update/delete Open
 packages/backend/src/api/expert.ts     - Domain/Scenario/Case CRUD with provisioning hooks
 packages/backend/src/api/chat.ts       - Chat with tool-calling loop
 packages/backend/src/api/bridge.ts     - Bridge API for tool execution
+packages/backend/src/api/skills.ts     - Skill generate/save/test endpoints
+packages/backend/src/api/skills-chat.ts - Chat-based skill generation with ephemeral sessions
 ```
 
 ### Shared (Modified)
@@ -377,4 +449,5 @@ packages/frontend/src/pages/CaseList.tsx
 packages/frontend/src/pages/CaseChat.tsx
 packages/frontend/src/components/expert/CasesSidebar.tsx
 packages/frontend/src/components/expert/CaseProgressWidget.tsx
+packages/frontend/src/components/panels/SkillGenerationPanel.tsx
 ```

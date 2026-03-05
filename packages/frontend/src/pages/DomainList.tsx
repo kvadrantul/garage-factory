@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Plus, Trash2, Edit2, Building2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, Building2, GitBranch } from 'lucide-react';
 import { domainsApi } from '@/api/client';
 
 export function DomainList() {
@@ -43,7 +43,7 @@ export function DomainList() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Offices</h1>
           <p className="text-muted-foreground mt-1">
-            Manage domain offices where expert agents operate
+            Manage offices where expert agents operate
           </p>
         </div>
         <button
@@ -51,7 +51,7 @@ export function DomainList() {
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
         >
           <Plus size={20} />
-          New Domain
+          New Office
         </button>
       </div>
 
@@ -60,12 +60,12 @@ export function DomainList() {
         ) : data?.data.length === 0 ? (
           <div className="text-center py-12">
             <Building2 size={48} className="mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground mb-4">No domains yet</p>
+            <p className="text-muted-foreground mb-4">No offices yet</p>
             <button
               onClick={() => setShowCreateModal(true)}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
             >
-              Create your first domain
+              Create your first office
             </button>
           </div>
         ) : (
@@ -95,7 +95,7 @@ export function DomainList() {
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm('Delete this domain? All scenarios and cases will be deleted.')) {
+                        if (confirm('Delete this office? All tools and cases will be deleted.')) {
                           deleteMutation.mutate(domain.id);
                         }
                       }}
@@ -111,15 +111,19 @@ export function DomainList() {
                     {domain.description}
                   </p>
                 )}
-                <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border text-xs text-muted-foreground">
-                  <span>Agent: {domain.agentId || 'Not set'}</span>
-                </div>
                 <div className="flex gap-2 mt-3">
+                  <Link
+                    to={`/domains/${domain.id}/workflows`}
+                    className="flex-1 text-center py-2 text-sm bg-muted hover:bg-muted/80 rounded transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <GitBranch size={14} />
+                    Workflows
+                  </Link>
                   <Link
                     to={`/scenarios?domain_id=${domain.id}`}
                     className="flex-1 text-center py-2 text-sm bg-muted hover:bg-muted/80 rounded transition-colors"
                   >
-                    Scenarios
+                    Tools
                   </Link>
                   <Link
                     to={`/cases?domain_id=${domain.id}`}
@@ -171,7 +175,6 @@ function DomainModal({
     slug: domain?.slug || '',
     description: domain?.description || '',
     icon: domain?.icon || '',
-    agentId: domain?.agentId || '',
     systemPrompt: domain?.systemPrompt || '',
   });
 
@@ -184,7 +187,7 @@ function DomainModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg border border-border p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-semibold mb-4">
-          {domain ? 'Edit Domain' : 'Create Domain'}
+          {domain ? 'Edit Office' : 'Create Office'}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -204,7 +207,7 @@ function DomainModal({
               value={formData.slug}
               onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="legal-office"
+              placeholder="my-office"
               required
             />
           </div>
@@ -225,16 +228,6 @@ function DomainModal({
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               rows={2}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Agent ID</label>
-            <input
-              type="text"
-              value={formData.agentId}
-              onChange={(e) => setFormData({ ...formData, agentId: e.target.value })}
-              className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="OpenClaw agent identifier"
             />
           </div>
           <div>

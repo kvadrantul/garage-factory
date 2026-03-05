@@ -141,6 +141,7 @@ skillsRouter.post('/save', async (req, res) => {
         name: `[Generated] ${scenarioMeta.name}`,
         definition: workflowDefinition,
         settings: workflowDefinition.settings ?? {},
+        domainId,
         active: true,
         createdAt: now,
         updatedAt: now,

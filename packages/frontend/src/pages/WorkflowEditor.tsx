@@ -51,10 +51,13 @@ const allNodeTypes = [
   'http-request', 'code', 'set',
   'if', 'switch', 'merge',
   'agent', 'hitl',
+  // Document processing nodes
+  'read-excel', 'filter-rows', 'group-by', 'sort-rows',
+  'select-columns', 'format-output', 'write-excel',
 ];
 
 export function WorkflowEditor() {
-  const { id } = useParams();
+  const { id, domainId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isNew = !id;
@@ -346,8 +349,8 @@ export function WorkflowEditor() {
       };
 
       if (isNew) {
-        const result = await workflowsApi.create({ name: workflowName, definition });
-        navigate(`/workflows/${result.id}`, { replace: true });
+        const result = await workflowsApi.create({ name: workflowName, definition, domainId });
+        navigate(`/domains/${domainId}/workflows/${result.id}`, { replace: true });
         return result;
       } else {
         return workflowsApi.update(id!, { name: workflowName, definition });
@@ -387,6 +390,7 @@ export function WorkflowEditor() {
     onSuccess: async (result: any) => {
       const execId = result.executionId;
       setExecutionId(execId);
+      setShowHistory(true);
       subscribe(execId);
       toast({ title: 'Workflow started', variant: 'default' });
 
@@ -575,7 +579,7 @@ export function WorkflowEditor() {
       <header className="bg-card border-b border-border px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/workflows')}
+            onClick={() => navigate(`/domains/${domainId}/workflows`)}
             className="p-2 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft size={20} />
@@ -677,17 +681,6 @@ export function WorkflowEditor() {
           </ReactFlow>
         </div>
 
-        {/* Config Panel */}
-        {selectedNodeId && (
-          <NDVPanel
-            nodeId={selectedNodeId}
-            nodes={nodes}
-            setNodes={setNodes}
-            onClose={() => setSelectedNodeId(null)}
-            onDelete={() => deleteNode(selectedNodeId)}
-          />
-        )}
-
         {/* Execution History Sidebar */}
         {showHistory && id && (
           <ExecutionHistorySidebar
@@ -700,11 +693,23 @@ export function WorkflowEditor() {
           />
         )}
 
+        {/* Config Panel */}
+        {selectedNodeId && (
+          <NDVPanel
+            nodeId={selectedNodeId}
+            nodes={nodes}
+            setNodes={setNodes}
+            onClose={() => setSelectedNodeId(null)}
+            onDelete={() => deleteNode(selectedNodeId)}
+          />
+        )}
+
         {/* Skill Generation Panel */}
         {showGenPanel && (
           <SkillGenerationPanel
             onClose={() => setShowGenPanel(false)}
             onWorkflowGenerated={handleWorkflowGenerated}
+            domainId={domainId}
           />
         )}
       </div>

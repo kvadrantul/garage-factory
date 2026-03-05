@@ -5,7 +5,7 @@ import { Router, type Router as RouterType } from 'express';
 import { db, schema } from '../db/index.js';
 import { eq, desc, and } from 'drizzle-orm';
 import type { Domain, Scenario, Case } from '@garage-engine/shared';
-import { provisionAgent, updateAgentIdentity, deleteAgent } from '../services/agent-provisioner.js';
+import { provisionAgent, updateAgentIdentity, deleteAgent, provisionBuilderAgent, updateBuilderAgentIdentity } from '../services/agent-provisioner.js';
 import { generateSkill, removeSkill } from '../services/skill-generator.js';
 
 export const expertRouter: RouterType = Router();
@@ -114,19 +114,41 @@ expertRouter.post('/domains', async (req, res) => {
 
     const domain = result[0];
 
-    // Provision OpenClaw agent if no agentId was provided
+    // Provision both agents in parallel for faster response
+    const domainInfo = { name, slug, description, icon, systemPrompt };
+    const provisionPromises: Promise<void>[] = [];
+
     if (!agentId) {
-      try {
-        const provision = await provisionAgent({ name, slug, description, icon, systemPrompt });
-        await db
-          .update(schema.domains)
-          .set({ agentId: provision.agentId, updatedAt: new Date() })
-          .where(eq(schema.domains.id, domain.id));
-        domain.agentId = provision.agentId;
-      } catch (err) {
-        console.warn('[expert] Agent provisioning failed (domain created without agent):', err);
-      }
+      provisionPromises.push(
+        provisionAgent(domainInfo)
+          .then(async (provision) => {
+            await db
+              .update(schema.domains)
+              .set({ agentId: provision.agentId, updatedAt: new Date() })
+              .where(eq(schema.domains.id, domain.id));
+            domain.agentId = provision.agentId;
+          })
+          .catch((err) => {
+            console.warn('[expert] Agent provisioning failed (domain created without agent):', err);
+          }),
+      );
     }
+
+    provisionPromises.push(
+      provisionBuilderAgent(domainInfo)
+        .then(async (provision) => {
+          await db
+            .update(schema.domains)
+            .set({ builderAgentId: provision.agentId, updatedAt: new Date() })
+            .where(eq(schema.domains.id, domain.id));
+          domain.builderAgentId = provision.agentId;
+        })
+        .catch((err) => {
+          console.warn('[expert] Builder agent provisioning failed:', err);
+        }),
+    );
+
+    await Promise.all(provisionPromises);
 
     res.status(201).json(domain);
   } catch (error) {
@@ -204,6 +226,20 @@ expertRouter.put('/domains/:id', async (req, res) => {
       }
     }
 
+    // Update builder agent identity if it exists
+    if (updated.builderAgentId) {
+      try {
+        await updateBuilderAgentIdentity(updated.builderAgentId, {
+          name: updated.name,
+          slug: updated.slug,
+          description: updated.description,
+          icon: updated.icon,
+        });
+      } catch (err) {
+        console.warn('[expert] Builder agent identity update failed:', err);
+      }
+    }
+
     res.json(updated);
   } catch (error) {
     console.error('Error updating domain:', error);
@@ -236,6 +272,15 @@ expertRouter.delete('/domains/:id', async (req, res) => {
         await deleteAgent(domain.agentId);
       } catch (err) {
         console.warn('[expert] Agent deletion failed:', err);
+      }
+    }
+
+    // Delete builder agent if it was provisioned
+    if (domain?.builderAgentId) {
+      try {
+        await deleteAgent(domain.builderAgentId);
+      } catch (err) {
+        console.warn('[expert] Builder agent deletion failed:', err);
       }
     }
 

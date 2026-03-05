@@ -5,8 +5,9 @@ import multer from 'multer';
 import XLSX from 'xlsx';
 import { nanoid } from 'nanoid';
 import { db, schema } from '../db/index.js';
-import { isNotNull } from 'drizzle-orm';
+import { eq, isNotNull } from 'drizzle-orm';
 import { generateWorkflowFromDescription } from '../services/skill-generator-llm.js';
+import { provisionBuilderAgent } from '../services/agent-provisioner.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,6 +23,7 @@ interface ChatStep {
 interface Session {
   id: string;
   agentId: string;
+  domainId?: string;
   steps: ChatStep[];
   createdAt: number;
 }
@@ -51,11 +53,68 @@ export const skillsChatRouter: RouterType = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // POST /api/skills/chat/start
-skillsChatRouter.post('/start', async (_req, res) => {
+skillsChatRouter.post('/start', async (req, res) => {
   try {
-    // Resolve agent: env var first, then fallback to first domain with an agent
-    let agentId = process.env.SKILL_GEN_AGENT_ID;
+    const { domainId } = req.body as { domainId?: string };
 
+    let agentId: string | undefined;
+    let resolvedDomainId = domainId;
+
+    if (domainId) {
+      // Domain-scoped: use the domain's builder agent
+      const domain = await db
+        .select()
+        .from(schema.domains)
+        .where(eq(schema.domains.id, domainId))
+        .get();
+
+      if (!domain) {
+        return res.status(404).json({
+          error: { code: 'NOT_FOUND', message: 'Domain not found' },
+        });
+      }
+
+      agentId = domain.builderAgentId ?? undefined;
+
+      // On-demand provisioning if builder agent doesn't exist yet
+      if (!agentId) {
+        try {
+          const provision = await provisionBuilderAgent({
+            name: domain.name,
+            slug: domain.slug,
+            description: domain.description,
+            icon: domain.icon,
+          });
+          await db
+            .update(schema.domains)
+            .set({ builderAgentId: provision.agentId, updatedAt: new Date() })
+            .where(eq(schema.domains.id, domainId));
+          agentId = provision.agentId;
+        } catch (err) {
+          console.warn('[skills-chat] On-demand builder agent provisioning failed:', err);
+        }
+      }
+    }
+
+    // Legacy fallback: env var
+    if (!agentId) {
+      agentId = process.env.SKILL_GEN_AGENT_ID;
+    }
+
+    // Legacy fallback: first domain with a builder agent
+    if (!agentId) {
+      const domainWithBuilder = await db
+        .select({ builderAgentId: schema.domains.builderAgentId, id: schema.domains.id })
+        .from(schema.domains)
+        .where(isNotNull(schema.domains.builderAgentId))
+        .limit(1)
+        .get();
+
+      agentId = domainWithBuilder?.builderAgentId ?? undefined;
+      resolvedDomainId = resolvedDomainId ?? domainWithBuilder?.id ?? undefined;
+    }
+
+    // Last fallback: first domain with any agent
     if (!agentId) {
       const domainWithAgent = await db
         .select({ agentId: schema.domains.agentId })
@@ -71,7 +130,7 @@ skillsChatRouter.post('/start', async (_req, res) => {
       return res.status(400).json({
         error: {
           code: 'NO_AGENT',
-          message: 'No agent configured for skill generation. Set SKILL_GEN_AGENT_ID environment variable or configure a domain with an agent.',
+          message: 'No agent configured for skill generation. Create a domain first or set SKILL_GEN_AGENT_ID environment variable.',
         },
       });
     }
@@ -89,6 +148,7 @@ skillsChatRouter.post('/start', async (_req, res) => {
     const session: Session = {
       id: sessionId,
       agentId,
+      domainId: resolvedDomainId,
       steps: [welcomeStep],
       createdAt: Date.now(),
     };

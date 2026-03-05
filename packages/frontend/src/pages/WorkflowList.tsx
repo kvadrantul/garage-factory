@@ -1,17 +1,24 @@
-// Workflow List Page
+// Workflow List Page (domain-scoped)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Play, Trash2, Sparkles } from 'lucide-react';
-import { workflowsApi } from '@/api/client';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Plus, Play, Trash2, Sparkles, ArrowLeft } from 'lucide-react';
+import { workflowsApi, domainsApi } from '@/api/client';
 
 export function WorkflowList() {
+  const { domainId } = useParams<{ domainId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const { data: domainData } = useQuery({
+    queryKey: ['domains', domainId],
+    queryFn: () => domainsApi.get(domainId!),
+    enabled: !!domainId,
+  });
+
   const { data, isLoading } = useQuery({
-    queryKey: ['workflows'],
-    queryFn: () => workflowsApi.list(),
+    queryKey: ['workflows', { domain_id: domainId }],
+    queryFn: () => workflowsApi.list({ domain_id: domainId }),
   });
 
   const deleteMutation = useMutation({
@@ -23,22 +30,38 @@ export function WorkflowList() {
     mutationFn: (id: string) => workflowsApi.execute(id),
   });
 
-  const handleCreate = async () => {
-    navigate('/workflows/new');
+  const handleCreate = () => {
+    navigate(`/domains/${domainId}/workflows/new`);
   };
+
+  const domain = domainData;
 
   return (
     <main className="p-6">
+      <div className="mb-4">
+        <Link
+          to="/domains"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft size={14} />
+          Offices
+        </Link>
+      </div>
+
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Workflows</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            {domain?.icon && <span className="mr-2">{domain.icon}</span>}
+            {domain?.name ?? 'Workflows'}
+            <span className="font-normal text-muted-foreground ml-2">/ Workflows</span>
+          </h1>
           <p className="text-muted-foreground mt-1">
             Build and manage automation workflows with visual editor
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate('/workflows/new?generate=true')}
+            onClick={() => navigate(`/domains/${domainId}/workflows/new?generate=true`)}
             className="flex items-center gap-2 px-4 py-2 border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-400 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
           >
             <Sparkles size={18} />
@@ -74,7 +97,7 @@ export function WorkflowList() {
                 className="bg-card rounded-lg border border-border p-5 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start justify-between">
-                  <Link to={`/workflows/${workflow.id}`} className="flex-1 min-w-0">
+                  <Link to={`/domains/${domainId}/workflows/${workflow.id}`} className="flex-1 min-w-0">
                     <h3 className="font-medium text-card-foreground">{workflow.name}</h3>
                     <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                       {workflow.description || 'No description'}

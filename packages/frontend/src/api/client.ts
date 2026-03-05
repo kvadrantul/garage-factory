@@ -43,12 +43,14 @@ async function requestFormData<T>(path: string, formData: FormData): Promise<T> 
 
 // Workflows API
 export const workflowsApi = {
-  list: (params?: { limit?: number; offset?: number }) =>
-    request<{ data: any[]; total: number }>(`/workflows?${new URLSearchParams(params as any)}`),
+  list: (params?: { limit?: number; offset?: number; domain_id?: string }) =>
+    request<{ data: any[]; total: number }>(`/workflows?${new URLSearchParams(
+      Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
+    )}`),
 
   get: (id: string) => request<any>(`/workflows/${id}`),
 
-  create: (data: { name: string; definition: any; settings?: any }) =>
+  create: (data: { name: string; definition: any; settings?: any; domainId?: string }) =>
     request<any>('/workflows', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -339,10 +341,10 @@ export const skillsApi = {
 
 // Skills Chat API (chat-based skill generation)
 export const skillsChatApi = {
-  start: () =>
+  start: (domainId?: string) =>
     request<{ sessionId: string; steps: any[] }>('/skills/chat/start', {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify({ domainId }),
     }),
 
   send: (sessionId: string, message: string, sampleFile?: File) => {
